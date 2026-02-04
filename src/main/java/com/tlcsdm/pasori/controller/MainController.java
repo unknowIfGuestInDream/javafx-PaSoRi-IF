@@ -489,6 +489,8 @@ public class MainController implements Initializable {
             var cssUrl = getClass().getResource(CONTROLSFX_CSS_FIX_PATH);
             if (cssUrl != null) {
                 stage.getScene().getStylesheets().add(cssUrl.toExternalForm());
+            } else {
+                System.err.println("Warning: ControlsFX CSS fix file not found at " + CONTROLSFX_CSS_FIX_PATH);
             }
         }
     }
