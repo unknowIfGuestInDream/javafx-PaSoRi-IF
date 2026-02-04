@@ -4,7 +4,7 @@ JavaFX tool for serial communication bridging between PaSoRi device and Panasoni
 
 ## Requirements
 
-- JDK 17 or later (tested with JDK 21)
+- JDK 21 or later
 - Maven 3.6 or later
 
 ## Dependencies
