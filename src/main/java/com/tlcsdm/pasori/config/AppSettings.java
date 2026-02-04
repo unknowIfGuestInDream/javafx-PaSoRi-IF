@@ -8,13 +8,16 @@ import com.dlsc.preferencesfx.model.Category;
 import com.dlsc.preferencesfx.model.Group;
 import com.dlsc.preferencesfx.model.Setting;
 import com.tlcsdm.pasori.model.DisplayLocale;
+import com.tlcsdm.pasori.model.LogColor;
+import javafx.beans.property.BooleanProperty;
 import javafx.beans.property.ObjectProperty;
+import javafx.beans.property.SimpleBooleanProperty;
 import javafx.beans.property.SimpleObjectProperty;
 import javafx.collections.FXCollections;
 
 import java.util.Arrays;
 import java.util.List;
-import java.util.Locale;
+import java.util.prefs.Preferences;
 
 /**
  * Application settings management using PreferencesFX.
@@ -23,8 +26,18 @@ public class AppSettings {
 
     private static AppSettings instance;
 
+    private static final Preferences PREFS = Preferences.userNodeForPackage(AppSettings.class);
+    private static final String PREF_LOG_TIMESTAMP = "logTimestamp";
+    private static final String PREF_LOG_COLOR_PASORI_TO_ANTENNA = "logColorPasoriToAntenna";
+    private static final String PREF_LOG_COLOR_ANTENNA_TO_PASORI = "logColorAntennaToPasori";
+    private static final String PREF_LOG_COLOR_SYSTEM = "logColorSystem";
+
     private final ObjectProperty<DisplayLocale> languageProperty;
     private final ObjectProperty<AppTheme> themeProperty;
+    private final BooleanProperty logTimestampProperty;
+    private final ObjectProperty<LogColor> logColorPasoriToAntennaProperty;
+    private final ObjectProperty<LogColor> logColorAntennaToPasoriProperty;
+    private final ObjectProperty<LogColor> logColorSystemProperty;
     
     private PreferencesFx preferencesFx;
 
@@ -32,6 +45,15 @@ public class AppSettings {
         // Initialize properties from saved preferences
         languageProperty = new SimpleObjectProperty<>(new DisplayLocale(I18N.getCurrentLocale()));
         themeProperty = new SimpleObjectProperty<>(AppTheme.getSavedTheme());
+        
+        // Log settings
+        logTimestampProperty = new SimpleBooleanProperty(PREFS.getBoolean(PREF_LOG_TIMESTAMP, true));
+        logColorPasoriToAntennaProperty = new SimpleObjectProperty<>(
+            loadLogColor(PREF_LOG_COLOR_PASORI_TO_ANTENNA, LogColor.BLUE));
+        logColorAntennaToPasoriProperty = new SimpleObjectProperty<>(
+            loadLogColor(PREF_LOG_COLOR_ANTENNA_TO_PASORI, LogColor.GREEN));
+        logColorSystemProperty = new SimpleObjectProperty<>(
+            loadLogColor(PREF_LOG_COLOR_SYSTEM, LogColor.GRAY));
 
         // Add listeners to apply changes immediately
         languageProperty.addListener((obs, oldVal, newVal) -> {
@@ -47,6 +69,31 @@ public class AppSettings {
                 AppTheme.saveTheme(newVal);
             }
         });
+
+        // Log settings listeners
+        logTimestampProperty.addListener((obs, oldVal, newVal) -> 
+            PREFS.putBoolean(PREF_LOG_TIMESTAMP, newVal));
+        logColorPasoriToAntennaProperty.addListener((obs, oldVal, newVal) -> 
+            saveLogColor(PREF_LOG_COLOR_PASORI_TO_ANTENNA, newVal));
+        logColorAntennaToPasoriProperty.addListener((obs, oldVal, newVal) -> 
+            saveLogColor(PREF_LOG_COLOR_ANTENNA_TO_PASORI, newVal));
+        logColorSystemProperty.addListener((obs, oldVal, newVal) -> 
+            saveLogColor(PREF_LOG_COLOR_SYSTEM, newVal));
+    }
+
+    private LogColor loadLogColor(String key, LogColor defaultColor) {
+        String saved = PREFS.get(key, defaultColor.name());
+        try {
+            return LogColor.valueOf(saved);
+        } catch (IllegalArgumentException e) {
+            return defaultColor;
+        }
+    }
+
+    private void saveLogColor(String key, LogColor color) {
+        if (color != null) {
+            PREFS.put(key, color.name());
+        }
     }
 
     /**
@@ -74,6 +121,52 @@ public class AppSettings {
     }
 
     /**
+     * Get the log timestamp property.
+     */
+    public BooleanProperty logTimestampProperty() {
+        return logTimestampProperty;
+    }
+
+    /**
+     * Get whether to show timestamps in log entries.
+     */
+    public boolean isLogTimestampEnabled() {
+        return logTimestampProperty.get();
+    }
+
+    /**
+     * Get the log color for PaSoRi to Antenna direction.
+     */
+    public ObjectProperty<LogColor> logColorPasoriToAntennaProperty() {
+        return logColorPasoriToAntennaProperty;
+    }
+
+    /**
+     * Get the log color for Antenna to PaSoRi direction.
+     */
+    public ObjectProperty<LogColor> logColorAntennaToPasoriProperty() {
+        return logColorAntennaToPasoriProperty;
+    }
+
+    /**
+     * Get the log color for system messages.
+     */
+    public ObjectProperty<LogColor> logColorSystemProperty() {
+        return logColorSystemProperty;
+    }
+
+    /**
+     * Get the hex color for a log direction.
+     */
+    public String getLogColorHex(com.tlcsdm.pasori.model.LogEntry.Direction direction) {
+        return switch (direction) {
+            case PASORI_TO_ANTENNA -> logColorPasoriToAntennaProperty.get().getHexColor();
+            case ANTENNA_TO_PASORI -> logColorAntennaToPasoriProperty.get().getHexColor();
+            case SYSTEM -> logColorSystemProperty.get().getHexColor();
+        };
+    }
+
+    /**
      * Create and show the settings dialog.
      */
     public PreferencesFx getPreferencesFx() {
@@ -88,6 +181,7 @@ public class AppSettings {
             .map(DisplayLocale::new)
             .toList();
         List<AppTheme> themes = Arrays.asList(AppTheme.values());
+        List<LogColor> logColors = Arrays.asList(LogColor.values());
 
         preferencesFx = PreferencesFx.of(new CenteredStorageHandler(AppSettings.class),
             Category.of(I18N.get("settings.general"),
@@ -98,6 +192,19 @@ public class AppSettings {
                     Setting.of(I18N.get("settings.theme"),
                         FXCollections.observableArrayList(themes),
                         themeProperty)
+                ),
+                Group.of(I18N.get("settings.logSettings"),
+                    Setting.of(I18N.get("settings.logTimestamp"),
+                        logTimestampProperty),
+                    Setting.of(I18N.get("settings.logColorPasoriToAntenna"),
+                        FXCollections.observableArrayList(logColors),
+                        logColorPasoriToAntennaProperty),
+                    Setting.of(I18N.get("settings.logColorAntennaToPasori"),
+                        FXCollections.observableArrayList(logColors),
+                        logColorAntennaToPasoriProperty),
+                    Setting.of(I18N.get("settings.logColorSystem"),
+                        FXCollections.observableArrayList(logColors),
+                        logColorSystemProperty)
                 )
             )
         ).persistWindowState(true)

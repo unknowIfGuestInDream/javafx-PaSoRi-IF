@@ -6,6 +6,9 @@ module com.tlcsdm.pasori {
     requires atlantafx.base;
     requires java.prefs;
     requires com.google.gson;
+    requires org.fxmisc.richtext;
+    requires org.fxmisc.flowless;
+    requires reactfx;
 
     opens com.tlcsdm.pasori to javafx.fxml;
     opens com.tlcsdm.pasori.controller to javafx.fxml;
