@@ -375,7 +375,7 @@ public class MainController implements Initializable {
         if (logLineCount > MAX_LOG_ENTRIES) {
             String text = logTextArea.getText();
             int firstNewline = text.indexOf('\n');
-            if (firstNewline > 0) {
+            if (firstNewline >= 0) {
                 logTextArea.setText(text.substring(firstNewline + 1));
             }
             logLineCount--;
@@ -391,7 +391,7 @@ public class MainController implements Initializable {
         // Auto scroll to bottom
         if (autoScrollCheck.isSelected()) {
             logTextArea.setScrollTop(Double.MAX_VALUE);
-            logTextArea.positionCaret(logTextArea.getText().length());
+            logTextArea.end();
         }
     }
 
