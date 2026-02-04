@@ -13,13 +13,20 @@ import com.tlcsdm.pasori.service.CommunicationBridgeService;
 import com.tlcsdm.pasori.service.SerialPortService;
 import javafx.application.Platform;
 import javafx.collections.FXCollections;
+import javafx.collections.ListChangeListener;
 import javafx.collections.ObservableList;
 import javafx.fxml.FXML;
 import javafx.fxml.Initializable;
 import javafx.scene.control.*;
+import javafx.scene.image.Image;
+import javafx.scene.input.Clipboard;
+import javafx.scene.input.ClipboardContent;
 import javafx.scene.paint.Color;
 import javafx.scene.shape.Circle;
 import javafx.stage.Stage;
+import javafx.stage.Window;
+
+import java.io.InputStream;
 
 import java.net.URL;
 import java.util.ResourceBundle;
@@ -70,6 +77,7 @@ public class MainController implements Initializable {
     private ResourceBundle resources;
 
     private static final int MAX_LOG_ENTRIES = 1000;
+    private static final String ICON_PATH = "/com/tlcsdm/pasori/images/logo.png";
 
     public MainController() {
         this.bridgeService = new CommunicationBridgeService();
@@ -99,6 +107,14 @@ public class MainController implements Initializable {
         // Setup log view
         logListView.setItems(logItems);
         autoScrollCheck.setSelected(true);
+        
+        // Setup context menu for log copy functionality
+        logListView.getSelectionModel().setSelectionMode(SelectionMode.MULTIPLE);
+        ContextMenu logContextMenu = new ContextMenu();
+        MenuItem copyMenuItem = new MenuItem(I18N.get("log.copy"));
+        copyMenuItem.setOnAction(event -> copySelectedLogEntries());
+        logContextMenu.getItems().add(copyMenuItem);
+        logListView.setContextMenu(logContextMenu);
 
         // Setup bridge service log callback
         bridgeService.setLogCallback(entry -> 
@@ -120,7 +136,27 @@ public class MainController implements Initializable {
 
     @FXML
     private void handleOpenSettings() {
-        AppSettings.getInstance().getPreferencesFx().show(true);
+        var preferencesFx = AppSettings.getInstance().getPreferencesFx();
+        
+        // Add listener to set icon when the settings dialog window appears
+        ListChangeListener<Window> windowListener = change -> {
+            while (change.next()) {
+                if (change.wasAdded()) {
+                    for (Window window : change.getAddedSubList()) {
+                        if (window instanceof Stage stage && stage != primaryStage) {
+                            setDialogIcon(stage);
+                        }
+                    }
+                }
+            }
+        };
+        Window.getWindows().addListener(windowListener);
+        
+        try {
+            preferencesFx.show(true);
+        } finally {
+            Window.getWindows().removeListener(windowListener);
+        }
     }
 
     @FXML
@@ -164,6 +200,10 @@ public class MainController implements Initializable {
         alert.setTitle(I18N.get("menu.about"));
         alert.setHeaderText("PaSoRi IF Tool");
         alert.setContentText(I18N.get("about.version") + "\n\n" + I18N.get("about.description"));
+        
+        // Set application icon to the dialog stage
+        setDialogIcon((Stage) alert.getDialogPane().getScene().getWindow());
+        
         alert.showAndWait();
     }
 
@@ -378,6 +418,32 @@ public class MainController implements Initializable {
         alert.setHeaderText(null);
         alert.setContentText(message);
         alert.showAndWait();
+    }
+
+    /**
+     * Copy selected log entries to clipboard.
+     */
+    private void copySelectedLogEntries() {
+        var selectedItems = logListView.getSelectionModel().getSelectedItems();
+        if (selectedItems != null && !selectedItems.isEmpty()) {
+            String content = String.join("\n", selectedItems);
+            ClipboardContent clipboardContent = new ClipboardContent();
+            clipboardContent.putString(content);
+            Clipboard.getSystemClipboard().setContent(clipboardContent);
+        }
+    }
+
+    /**
+     * Set the application icon on a dialog stage.
+     */
+    private void setDialogIcon(Stage stage) {
+        try (InputStream iconStream = getClass().getResourceAsStream(ICON_PATH)) {
+            if (iconStream != null) {
+                stage.getIcons().add(new Image(iconStream));
+            }
+        } catch (Exception e) {
+            // Ignore if icon cannot be loaded
+        }
     }
 
     /**
