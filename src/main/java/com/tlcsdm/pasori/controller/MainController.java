@@ -4,6 +4,7 @@
 package com.tlcsdm.pasori.controller;
 
 import com.fazecast.jSerialComm.SerialPort;
+import com.tlcsdm.pasori.PaSoRiApplication;
 import com.tlcsdm.pasori.config.AppSettings;
 import com.tlcsdm.pasori.config.I18N;
 import com.tlcsdm.pasori.model.LogEntry;
@@ -143,6 +144,32 @@ public class MainController implements Initializable {
             primaryStage.close();
         }
         Platform.exit();
+    }
+
+    @FXML
+    private void handleRestart() {
+        Platform.runLater(() -> {
+            shutdown();
+            if (primaryStage != null) {
+                primaryStage.close();
+            }
+            try {
+                PaSoRiApplication app = new PaSoRiApplication();
+                app.init();
+                app.start(new Stage());
+            } catch (Exception e) {
+                String errorMessage = e.getMessage();
+                if (errorMessage == null || errorMessage.isEmpty()) {
+                    errorMessage = e.toString();
+                }
+                Alert alert = new Alert(Alert.AlertType.ERROR);
+                alert.setTitle(I18N.get("error.title"));
+                alert.setHeaderText(null);
+                alert.setContentText(I18N.get("error.restartFailed") + "\n" + errorMessage);
+                alert.showAndWait();
+                Platform.exit();
+            }
+        });
     }
 
     @FXML
