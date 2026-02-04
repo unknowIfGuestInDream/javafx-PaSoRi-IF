@@ -5,6 +5,7 @@ package com.tlcsdm.pasori.config;
 
 import java.text.MessageFormat;
 import java.util.Locale;
+import java.util.MissingResourceException;
 import java.util.ResourceBundle;
 import java.util.prefs.Preferences;
 
@@ -71,12 +72,13 @@ public class I18N {
      * Get a localized string for the given key.
      *
      * @param key the resource key
-     * @return the localized string
+     * @return the localized string, or the key itself if not found
      */
     public static String get(String key) {
         try {
             return bundle.getString(key);
-        } catch (Exception e) {
+        } catch (MissingResourceException e) {
+            // Return the key as fallback for missing translations
             return key;
         }
     }
@@ -86,14 +88,22 @@ public class I18N {
      *
      * @param key the resource key
      * @param params the parameters to substitute
-     * @return the localized string with parameters
+     * @return the localized string with parameters, or the key itself if not found
      */
     public static String get(String key, Object... params) {
         try {
             String pattern = bundle.getString(key);
             return MessageFormat.format(pattern, params);
-        } catch (Exception e) {
+        } catch (MissingResourceException e) {
+            // Return the key as fallback for missing translations
             return key;
+        } catch (IllegalArgumentException e) {
+            // Return the pattern if formatting fails
+            try {
+                return bundle.getString(key);
+            } catch (MissingResourceException ex) {
+                return key;
+            }
         }
     }
 

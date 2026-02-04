@@ -126,7 +126,7 @@ public class MainController implements Initializable {
             Alert alert = new Alert(Alert.AlertType.INFORMATION);
             alert.setTitle(I18N.get("settings.title"));
             alert.setHeaderText(null);
-            alert.setContentText("Language changed. Please restart the application for full effect.");
+            alert.setContentText(I18N.get("system.restartRequired"));
             alert.showAndWait();
         });
     }
@@ -150,7 +150,7 @@ public class MainController implements Initializable {
         Alert alert = new Alert(Alert.AlertType.INFORMATION);
         alert.setTitle(I18N.get("menu.about"));
         alert.setHeaderText("PaSoRi IF Tool");
-        alert.setContentText("Version 1.0.0\n\nJavaFX tool for serial communication bridging between PaSoRi device and Panasonic USB CDC-ACM (アンテナIF仕様) device.");
+        alert.setContentText(I18N.get("about.version") + "\n\n" + I18N.get("about.description"));
         alert.showAndWait();
     }
 

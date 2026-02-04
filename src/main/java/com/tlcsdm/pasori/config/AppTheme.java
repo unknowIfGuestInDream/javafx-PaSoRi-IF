@@ -13,12 +13,11 @@ import java.util.prefs.Preferences;
 
 /**
  * Theme configuration for the application.
- * Supports JavaFX default themes and AtlantaFX themes.
+ * Supports JavaFX default theme and AtlantaFX themes.
  */
 public enum AppTheme {
     
     LIGHT("settings.theme.light", null),
-    DARK("settings.theme.dark", null),
     ATLANTAFX_PRIMER_LIGHT("settings.theme.atlantafx.primerLight", PrimerLight.class.getName()),
     ATLANTAFX_PRIMER_DARK("settings.theme.atlantafx.primerDark", PrimerDark.class.getName()),
     ATLANTAFX_NORD_LIGHT("settings.theme.atlantafx.nordLight", NordLight.class.getName()),
@@ -56,14 +55,8 @@ public enum AppTheme {
         if (themeClass != null) {
             Application.setUserAgentStylesheet(themeClass);
         } else {
-            // Reset to default JavaFX styles
-            if (this == DARK) {
-                // Use a simple dark style or reset
-                Application.setUserAgentStylesheet(null);
-            } else {
-                // Default light theme
-                Application.setUserAgentStylesheet(null);
-            }
+            // Reset to default JavaFX theme
+            Application.setUserAgentStylesheet(null);
         }
     }
 
