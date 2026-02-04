@@ -118,9 +118,5 @@
             </HBox>
         </VBox>
 
-        <!-- Footer / Status Bar -->
-        <HBox alignment="CENTER" style="-fx-background-color: #f0f0f0; -fx-padding: 5;">
-            <Label text="%footer.message"/>
-        </HBox>
     </VBox>
 </VBox>
