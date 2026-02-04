@@ -32,6 +32,9 @@ public enum AppTheme {
     private final Supplier<Theme> themeSupplier;
 
     AppTheme(String displayNameKey, Supplier<Theme> themeSupplier) {
+        if (themeSupplier == null) {
+            throw new IllegalArgumentException("themeSupplier must not be null");
+        }
         this.displayNameKey = displayNameKey;
         this.themeSupplier = themeSupplier;
     }
