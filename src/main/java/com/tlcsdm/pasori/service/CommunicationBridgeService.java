@@ -10,7 +10,9 @@ import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 
 /**
@@ -28,22 +30,49 @@ public class CommunicationBridgeService {
     private final SerialPortService antennaIfService;
     
     // Message queues for reliable message delivery
-    private final BlockingQueue<byte[]> pasoriToAntennaQueue;
-    private final BlockingQueue<byte[]> antennaToPasoriQueue;
+    private final BlockingQueue<QueuedMessage> pasoriToAntennaQueue;
+    private final BlockingQueue<QueuedMessage> antennaToPasoriQueue;
     
     // Background executor for processing queued messages
     private final ExecutorService messageProcessor;
     
+    // Maximum retry attempts for message delivery before discarding
+    private static final int MAX_RETRY_ATTEMPTS = 100;
+    
     private Consumer<LogEntry> logCallback;
     private volatile boolean bridgingEnabled = false;
     private volatile boolean running = true;
+    
+    /**
+     * Wrapper class for queued messages with retry tracking.
+     */
+    private static class QueuedMessage {
+        final byte[] data;
+        int retryCount;
+        
+        QueuedMessage(byte[] data) {
+            this.data = data;
+            this.retryCount = 0;
+        }
+    }
 
     public CommunicationBridgeService() {
         this.pasoriService = new SerialPortService();
         this.antennaIfService = new SerialPortService();
         this.pasoriToAntennaQueue = new LinkedBlockingQueue<>();
         this.antennaToPasoriQueue = new LinkedBlockingQueue<>();
-        this.messageProcessor = Executors.newFixedThreadPool(2);
+        
+        // Create named thread factory for better debugging
+        ThreadFactory threadFactory = new ThreadFactory() {
+            private final AtomicInteger threadNumber = new AtomicInteger(1);
+            @Override
+            public Thread newThread(Runnable r) {
+                Thread t = new Thread(r, "message-processor-" + threadNumber.getAndIncrement());
+                t.setDaemon(true);
+                return t;
+            }
+        };
+        this.messageProcessor = Executors.newFixedThreadPool(2, threadFactory);
         
         setupCallbacks();
         startMessageProcessors();
@@ -57,14 +86,19 @@ public class CommunicationBridgeService {
         messageProcessor.submit(() -> {
             while (running) {
                 try {
-                    byte[] data = pasoriToAntennaQueue.poll(100, TimeUnit.MILLISECONDS);
-                    if (data != null && antennaIfService.isConnected()) {
-                        antennaIfService.sendData(data);
-                    } else if (data != null) {
-                        // Re-queue if antenna is not connected
-                        pasoriToAntennaQueue.offer(data);
-                        // Brief sleep to prevent busy-waiting
-                        Thread.sleep(50);
+                    QueuedMessage message = pasoriToAntennaQueue.poll(100, TimeUnit.MILLISECONDS);
+                    if (message != null && antennaIfService.isConnected()) {
+                        antennaIfService.sendData(message.data);
+                    } else if (message != null) {
+                        // Re-queue if antenna is not connected, with retry limit
+                        message.retryCount++;
+                        if (message.retryCount < MAX_RETRY_ATTEMPTS) {
+                            pasoriToAntennaQueue.offer(message);
+                            // Brief sleep to prevent busy-waiting
+                            Thread.sleep(50);
+                        } else {
+                            log(LogEntry.Direction.SYSTEM, "Message to Antenna discarded after max retries");
+                        }
                     }
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
@@ -77,14 +111,19 @@ public class CommunicationBridgeService {
         messageProcessor.submit(() -> {
             while (running) {
                 try {
-                    byte[] data = antennaToPasoriQueue.poll(100, TimeUnit.MILLISECONDS);
-                    if (data != null && pasoriService.isConnected()) {
-                        pasoriService.sendData(data);
-                    } else if (data != null) {
-                        // Re-queue if PaSoRi is not connected
-                        antennaToPasoriQueue.offer(data);
-                        // Brief sleep to prevent busy-waiting
-                        Thread.sleep(50);
+                    QueuedMessage message = antennaToPasoriQueue.poll(100, TimeUnit.MILLISECONDS);
+                    if (message != null && pasoriService.isConnected()) {
+                        pasoriService.sendData(message.data);
+                    } else if (message != null) {
+                        // Re-queue if PaSoRi is not connected, with retry limit
+                        message.retryCount++;
+                        if (message.retryCount < MAX_RETRY_ATTEMPTS) {
+                            antennaToPasoriQueue.offer(message);
+                            // Brief sleep to prevent busy-waiting
+                            Thread.sleep(50);
+                        } else {
+                            log(LogEntry.Direction.SYSTEM, "Message to PaSoRi discarded after max retries");
+                        }
                     }
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
@@ -99,7 +138,7 @@ public class CommunicationBridgeService {
         pasoriService.setDataReceivedCallback(data -> {
             log(LogEntry.Direction.PASORI_TO_ANTENNA, data);
             if (bridgingEnabled) {
-                pasoriToAntennaQueue.offer(data);
+                pasoriToAntennaQueue.offer(new QueuedMessage(data));
             }
         });
 
@@ -107,7 +146,7 @@ public class CommunicationBridgeService {
         antennaIfService.setDataReceivedCallback(data -> {
             log(LogEntry.Direction.ANTENNA_TO_PASORI, data);
             if (bridgingEnabled) {
-                antennaToPasoriQueue.offer(data);
+                antennaToPasoriQueue.offer(new QueuedMessage(data));
             }
         });
 
