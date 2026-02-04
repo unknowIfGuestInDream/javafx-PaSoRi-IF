@@ -53,6 +53,8 @@ public class PaSoRiApplication extends Application {
         try (InputStream iconStream = getClass().getResourceAsStream("images/logo.png")) {
             if (iconStream != null) {
                 primaryStage.getIcons().add(new Image(iconStream));
+            } else {
+                System.err.println("Warning: Application icon not found at images/logo.png");
             }
         }
         
