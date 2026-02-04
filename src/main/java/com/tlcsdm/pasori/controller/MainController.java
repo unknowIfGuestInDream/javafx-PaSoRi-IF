@@ -7,7 +7,6 @@ import com.fazecast.jSerialComm.SerialPort;
 import com.tlcsdm.pasori.PaSoRiApplication;
 import com.tlcsdm.pasori.config.AppSettings;
 import com.tlcsdm.pasori.config.I18N;
-import com.tlcsdm.pasori.model.LogEntry;
 import com.tlcsdm.pasori.model.SerialPortConfig;
 import com.tlcsdm.pasori.service.CommunicationBridgeService;
 import com.tlcsdm.pasori.service.SerialPortService;
@@ -19,8 +18,6 @@ import javafx.fxml.FXML;
 import javafx.fxml.Initializable;
 import javafx.scene.control.*;
 import javafx.scene.image.Image;
-import javafx.scene.input.Clipboard;
-import javafx.scene.input.ClipboardContent;
 import javafx.scene.paint.Color;
 import javafx.scene.shape.Circle;
 import javafx.stage.Stage;
@@ -58,7 +55,7 @@ public class MainController implements Initializable {
     @FXML private Button refreshPortsBtn;
 
     // Communication log
-    @FXML private ListView<String> logListView;
+    @FXML private TextArea logTextArea;
     @FXML private Button clearLogBtn;
     @FXML private CheckBox autoScrollCheck;
 
@@ -70,18 +67,17 @@ public class MainController implements Initializable {
     @FXML private Button sendBtn;
 
     private final CommunicationBridgeService bridgeService;
-    private final ObservableList<String> logItems;
     private final ObservableList<Integer> baudRates;
 
     private Stage primaryStage;
     private ResourceBundle resources;
+    private int logLineCount = 0;
 
     private static final int MAX_LOG_ENTRIES = 1000;
     private static final String ICON_PATH = "/com/tlcsdm/pasori/images/logo.png";
 
     public MainController() {
         this.bridgeService = new CommunicationBridgeService();
-        this.logItems = FXCollections.observableArrayList();
         this.baudRates = FXCollections.observableArrayList(
             9600, 19200, 38400, 57600, 115200, 230400, 460800, 921600
         );
@@ -104,17 +100,10 @@ public class MainController implements Initializable {
         antennaBaudCombo.setItems(baudRates);
         antennaBaudCombo.setValue(115200);
 
-        // Setup log view
-        logListView.setItems(logItems);
+        // Setup log text area (read-only but selectable for copying)
+        logTextArea.setEditable(false);
+        logTextArea.setWrapText(true);
         autoScrollCheck.setSelected(true);
-        
-        // Setup context menu for log copy functionality
-        logListView.getSelectionModel().setSelectionMode(SelectionMode.MULTIPLE);
-        ContextMenu logContextMenu = new ContextMenu();
-        MenuItem copyMenuItem = new MenuItem(I18N.get("log.copy"));
-        copyMenuItem.setOnAction(event -> copySelectedLogEntries());
-        logContextMenu.getItems().add(copyMenuItem);
-        logListView.setContextMenu(logContextMenu);
 
         // Setup bridge service log callback
         bridgeService.setLogCallback(entry -> 
@@ -279,7 +268,8 @@ public class MainController implements Initializable {
 
     @FXML
     private void handleClearLog() {
-        logItems.clear();
+        logTextArea.clear();
+        logLineCount = 0;
     }
 
     @FXML
@@ -379,16 +369,29 @@ public class MainController implements Initializable {
     }
 
     private void addLogEntry(String entry) {
-        logItems.add(entry);
+        logLineCount++;
         
-        // Limit log size
-        while (logItems.size() > MAX_LOG_ENTRIES) {
-            logItems.remove(0);
+        // Limit log size - trim from the beginning if too many entries
+        if (logLineCount > MAX_LOG_ENTRIES) {
+            String text = logTextArea.getText();
+            int firstNewline = text.indexOf('\n');
+            if (firstNewline >= 0) {
+                logTextArea.setText(text.substring(firstNewline + 1));
+            }
+            logLineCount--;
+        }
+
+        // Append new entry
+        if (logTextArea.getText().isEmpty()) {
+            logTextArea.setText(entry);
+        } else {
+            logTextArea.appendText("\n" + entry);
         }
 
         // Auto scroll to bottom
         if (autoScrollCheck.isSelected()) {
-            logListView.scrollTo(logItems.size() - 1);
+            logTextArea.setScrollTop(Double.MAX_VALUE);
+            logTextArea.end();
         }
     }
 
@@ -418,19 +421,6 @@ public class MainController implements Initializable {
         alert.setHeaderText(null);
         alert.setContentText(message);
         alert.showAndWait();
-    }
-
-    /**
-     * Copy selected log entries to clipboard.
-     */
-    private void copySelectedLogEntries() {
-        var selectedItems = logListView.getSelectionModel().getSelectedItems();
-        if (selectedItems != null && !selectedItems.isEmpty()) {
-            String content = String.join("\n", selectedItems);
-            ClipboardContent clipboardContent = new ClipboardContent();
-            clipboardContent.putString(content);
-            Clipboard.getSystemClipboard().setContent(clipboardContent);
-        }
     }
 
     /**

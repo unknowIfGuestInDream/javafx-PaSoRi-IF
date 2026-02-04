@@ -7,6 +7,7 @@ import com.dlsc.preferencesfx.PreferencesFx;
 import com.dlsc.preferencesfx.model.Category;
 import com.dlsc.preferencesfx.model.Group;
 import com.dlsc.preferencesfx.model.Setting;
+import com.tlcsdm.pasori.model.DisplayLocale;
 import javafx.beans.property.ObjectProperty;
 import javafx.beans.property.SimpleObjectProperty;
 import javafx.collections.FXCollections;
@@ -22,20 +23,20 @@ public class AppSettings {
 
     private static AppSettings instance;
 
-    private final ObjectProperty<Locale> languageProperty;
+    private final ObjectProperty<DisplayLocale> languageProperty;
     private final ObjectProperty<AppTheme> themeProperty;
     
     private PreferencesFx preferencesFx;
 
     private AppSettings() {
         // Initialize properties from saved preferences
-        languageProperty = new SimpleObjectProperty<>(I18N.getCurrentLocale());
+        languageProperty = new SimpleObjectProperty<>(new DisplayLocale(I18N.getCurrentLocale()));
         themeProperty = new SimpleObjectProperty<>(AppTheme.getSavedTheme());
 
         // Add listeners to apply changes immediately
         languageProperty.addListener((obs, oldVal, newVal) -> {
             if (newVal != null && !newVal.equals(oldVal)) {
-                I18N.setLocale(newVal);
+                I18N.setLocale(newVal.getLocale());
                 rebuildPreferences();
             }
         });
@@ -61,7 +62,7 @@ public class AppSettings {
     /**
      * Get the language property.
      */
-    public ObjectProperty<Locale> languageProperty() {
+    public ObjectProperty<DisplayLocale> languageProperty() {
         return languageProperty;
     }
 
@@ -83,12 +84,14 @@ public class AppSettings {
     }
 
     private void buildPreferences() {
-        List<Locale> supportedLocales = Arrays.asList(I18N.getSupportedLocales());
+        List<DisplayLocale> supportedLocales = Arrays.stream(I18N.getSupportedLocales())
+            .map(DisplayLocale::new)
+            .toList();
         List<AppTheme> themes = Arrays.asList(AppTheme.values());
 
         preferencesFx = PreferencesFx.of(new CenteredStorageHandler(AppSettings.class),
             Category.of(I18N.get("settings.general"),
-                Group.of(I18N.get("settings.appearance"),
+                Group.of(I18N.get("settings.languageAndTheme"),
                     Setting.of(I18N.get("settings.language"),
                         FXCollections.observableArrayList(supportedLocales),
                         languageProperty),

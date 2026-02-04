@@ -101,7 +101,7 @@
                 <Button fx:id="clearLogBtn" text="%button.clear" onAction="#handleClearLog"/>
             </HBox>
             
-            <ListView fx:id="logListView" VBox.vgrow="ALWAYS" style="-fx-font-family: monospace;"/>
+            <TextArea fx:id="logTextArea" VBox.vgrow="ALWAYS" editable="false" wrapText="true" style="-fx-font-family: monospace;"/>
         </VBox>
 
         <!-- Manual Send Panel -->
