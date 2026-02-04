@@ -109,10 +109,17 @@ public class I18N {
 
     /**
      * Get the current locale.
+     * Returns the matching locale from getSupportedLocales() to ensure proper equality check.
      *
      * @return the current locale
      */
     public static Locale getCurrentLocale() {
+        // Return the matching supported locale to ensure proper ComboBox selection
+        for (Locale supported : getSupportedLocales()) {
+            if (supported.getLanguage().equals(currentLocale.getLanguage())) {
+                return supported;
+            }
+        }
         return currentLocale;
     }
 

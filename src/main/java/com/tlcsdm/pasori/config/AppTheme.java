@@ -7,9 +7,11 @@ import atlantafx.base.theme.NordDark;
 import atlantafx.base.theme.NordLight;
 import atlantafx.base.theme.PrimerDark;
 import atlantafx.base.theme.PrimerLight;
+import atlantafx.base.theme.Theme;
 import javafx.application.Application;
 
 import java.util.prefs.Preferences;
+import java.util.function.Supplier;
 
 /**
  * Theme configuration for the application.
@@ -18,20 +20,20 @@ import java.util.prefs.Preferences;
 public enum AppTheme {
     
     LIGHT("settings.theme.light", null),
-    ATLANTAFX_PRIMER_LIGHT("settings.theme.atlantafx.primerLight", PrimerLight.class.getName()),
-    ATLANTAFX_PRIMER_DARK("settings.theme.atlantafx.primerDark", PrimerDark.class.getName()),
-    ATLANTAFX_NORD_LIGHT("settings.theme.atlantafx.nordLight", NordLight.class.getName()),
-    ATLANTAFX_NORD_DARK("settings.theme.atlantafx.nordDark", NordDark.class.getName());
+    ATLANTAFX_PRIMER_LIGHT("settings.theme.atlantafx.primerLight", PrimerLight::new),
+    ATLANTAFX_PRIMER_DARK("settings.theme.atlantafx.primerDark", PrimerDark::new),
+    ATLANTAFX_NORD_LIGHT("settings.theme.atlantafx.nordLight", NordLight::new),
+    ATLANTAFX_NORD_DARK("settings.theme.atlantafx.nordDark", NordDark::new);
 
     private static final String PREF_KEY_THEME = "theme";
     private static final Preferences PREFS = Preferences.userNodeForPackage(AppTheme.class);
 
     private final String displayNameKey;
-    private final String themeClass;
+    private final Supplier<Theme> themeSupplier;
 
-    AppTheme(String displayNameKey, String themeClass) {
+    AppTheme(String displayNameKey, Supplier<Theme> themeSupplier) {
         this.displayNameKey = displayNameKey;
-        this.themeClass = themeClass;
+        this.themeSupplier = themeSupplier;
     }
 
     /**
@@ -52,8 +54,8 @@ public enum AppTheme {
      * Apply this theme to the application.
      */
     public void apply() {
-        if (themeClass != null) {
-            Application.setUserAgentStylesheet(themeClass);
+        if (themeSupplier != null) {
+            Application.setUserAgentStylesheet(themeSupplier.get().getUserAgentStylesheet());
         } else {
             // Reset to default JavaFX theme
             Application.setUserAgentStylesheet(null);
@@ -62,14 +64,14 @@ public enum AppTheme {
 
     /**
      * Get the saved theme from preferences.
-     * Default is LIGHT.
+     * Default is ATLANTAFX_PRIMER_LIGHT.
      */
     public static AppTheme getSavedTheme() {
-        String themeName = PREFS.get(PREF_KEY_THEME, LIGHT.name());
+        String themeName = PREFS.get(PREF_KEY_THEME, ATLANTAFX_PRIMER_LIGHT.name());
         try {
             return AppTheme.valueOf(themeName);
         } catch (IllegalArgumentException e) {
-            return LIGHT;
+            return ATLANTAFX_PRIMER_LIGHT;
         }
     }
 
