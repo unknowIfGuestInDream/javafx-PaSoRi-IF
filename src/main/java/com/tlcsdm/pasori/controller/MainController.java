@@ -154,9 +154,15 @@ public class MainController implements Initializable {
         }
         Platform.runLater(() -> {
             try {
-                new PaSoRiApplication().start(new Stage());
+                PaSoRiApplication app = new PaSoRiApplication();
+                app.init();
+                app.start(new Stage());
             } catch (Exception e) {
-                // If restart fails, exit the application
+                Alert alert = new Alert(Alert.AlertType.ERROR);
+                alert.setTitle(I18N.get("error.title"));
+                alert.setHeaderText(null);
+                alert.setContentText(I18N.get("error.restartFailed") + "\n" + e.getMessage());
+                alert.showAndWait();
                 Platform.exit();
             }
         });
