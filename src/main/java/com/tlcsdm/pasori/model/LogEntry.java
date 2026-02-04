@@ -1,6 +1,5 @@
 /*
  * Copyright (c) 2026, 梦里不知身是客
- * Licensed under the MIT License
  */
 package com.tlcsdm.pasori.model;
 
