@@ -1,0 +1,113 @@
+name: Artifact
+
+on:
+  push:
+    branches: [ master ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  upload-artifact:
+    strategy:
+      matrix:
+        os: [ ubuntu-latest, windows-latest ]
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: maven
+
+      - name: Build with Maven
+        run: mvn clean package -DskipTests
+
+      - name: Resolve version & jar (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $versionOutput = & mvn -q -DforceStdout 'help:evaluate' -Dexpression='project.version' 2>$null
+          $version = $versionOutput.Trim()
+          if (-not $version) { throw 'Failed to extract version from Maven' }
+          Add-Content -Path $env:GITHUB_ENV -Value "APP_VERSION=$version" -Encoding utf8
+
+          $jar = Get-ChildItem -Path 'target\javafx-pasori-if.jar' -File -ErrorAction SilentlyContinue | Select-Object -First 1
+          if ($null -eq $jar) { throw 'No jar file found matching pattern target\javafx-pasori-if.jar' }
+          Add-Content -Path $env:GITHUB_ENV -Value "APP_JAR=$($jar.Name)" -Encoding utf8
+
+          if (-not (Test-Path dist)) { New-Item -ItemType Directory -Path dist | Out-Null }
+          $jarFull = $jar.FullName
+
+          # Create staging directory
+          $stagingDir = 'staging'
+          if (-not (Test-Path $stagingDir)) { New-Item -ItemType Directory -Path $stagingDir | Out-Null }
+
+          # Copy files to staging
+          Copy-Item -Path $jarFull -Destination $stagingDir
+          Copy-Item -Path 'README.md' -Destination $stagingDir
+          Copy-Item -Path 'LICENSE' -Destination $stagingDir
+          Copy-Item -Path 'scripts\win\*' -Destination $stagingDir -Recurse
+
+      - name: Download JRE (Windows)
+        if: (github.event_name == 'workflow_dispatch' || github.event_name == 'release') && runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          Push-Location staging
+          & ..\scripts\jre.ps1
+          Pop-Location
+
+      - name: Package artifact (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          Compress-Archive -Path 'staging\*' -DestinationPath "dist/javafx-pasori-if-windows-$env:APP_VERSION.zip" -Force
+          Write-Host "Created dist/javafx-pasori-if-windows-$env:APP_VERSION.zip"
+          Remove-Item -Path 'staging' -Recurse -Force
+
+      - name: Resolve version & jar (Linux)
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          version=$(mvn -q -DforceStdout 'help:evaluate' -Dexpression=project.version 2>/dev/null)
+          version=$(echo "$version" | tr -d '\r')
+          if [ -z "$version" ]; then echo "Failed to extract version from Maven" >&2; exit 1; fi
+          echo "APP_VERSION=$version" >> $GITHUB_ENV
+
+          jar=$(ls target/javafx-pasori-if.jar 2>/dev/null | head -n1 || true)
+          if [ -z "$jar" ]; then echo "No jar file found matching pattern target/javafx-pasori-if.jar" >&2; exit 1; fi
+          echo "APP_JAR=$(basename "$jar")" >> $GITHUB_ENV
+
+          mkdir -p dist staging
+          cp "$jar" README.md LICENSE staging/
+          cp scripts/linux/* staging/
+
+      - name: Download JRE (Linux)
+        if: (github.event_name == 'workflow_dispatch' || github.event_name == 'release') && runner.os == 'Linux'
+        shell: bash
+        run: |
+          cd staging
+          bash ../scripts/jre.sh
+          cd ..
+
+      - name: Package artifact (Linux)
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          cd staging
+          zip -r "../dist/javafx-pasori-if-linux-${APP_VERSION}.zip" .
+          cd ..
+          echo "Created dist/javafx-pasori-if-linux-${APP_VERSION}.zip"
+          rm -rf staging
+
+      - name: Upload packaged artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: javafx-pasori-if-${{ matrix.os }}
+          path: dist/*
+          retention-days: 7

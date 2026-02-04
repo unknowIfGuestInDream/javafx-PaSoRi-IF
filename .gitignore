@@ -40,3 +40,7 @@ hs_err_pid*
 *.dylib
 *.dll
 *.so
+
+# Build artifacts
+staging/
+dist/

@@ -16,8 +16,10 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <maven.compiler.source>17</maven.compiler.source>
         <maven.compiler.target>17</maven.compiler.target>
+        <maven.build.timestamp.format>yyyy-MM-dd</maven.build.timestamp.format>
         <javafx.version>21.0.2</javafx.version>
         <jserialcomm.version>2.10.4</jserialcomm.version>
+        <mainClass>com.tlcsdm.pasori.Launcher</mainClass>
     </properties>
 
     <dependencies>
@@ -42,6 +44,7 @@
     </dependencies>
 
     <build>
+        <finalName>javafx-pasori-if</finalName>
         <plugins>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
@@ -67,10 +70,45 @@
                 <configuration>
                     <archive>
                         <manifest>
-                            <mainClass>com.tlcsdm.pasori.PaSoRiApplication</mainClass>
+                            <mainClass>${mainClass}</mainClass>
                         </manifest>
+                        <manifestEntries>
+                            <Built-By>${user.name}</Built-By>
+                            <Build-Os>${os.name} (${os.version}; (${os.arch})</Build-Os>
+                            <Build-Jdk>${java.vendor} ${java.version}</Build-Jdk>
+                            <Build-Day>${maven.build.timestamp}</Build-Day>
+                            <Bundle-ManifestVersion>2</Bundle-ManifestVersion>
+                            <Bundle-SymbolicName>${project.groupId}.${project.artifactId}</Bundle-SymbolicName>
+                            <Bundle-Vendor>Tlcsdm</Bundle-Vendor>
+                        </manifestEntries>
                     </archive>
                 </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-shade-plugin</artifactId>
+                <version>3.6.0</version>
+                <executions>
+                    <execution>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>shade</goal>
+                        </goals>
+                        <configuration>
+                            <createDependencyReducedPom>false</createDependencyReducedPom>
+                            <transformers>
+                                <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
+                                    <mainClass>${mainClass}</mainClass>
+                                </transformer>
+                            </transformers>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-help-plugin</artifactId>
+                <version>3.4.0</version>
             </plugin>
         </plugins>
     </build>
