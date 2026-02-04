@@ -50,7 +50,6 @@ jobs:
           # Copy files to staging
           Copy-Item -Path $jarFull -Destination $stagingDir
           Copy-Item -Path 'README.md' -Destination $stagingDir
-          Copy-Item -Path 'LICENSE' -Destination $stagingDir
           Copy-Item -Path 'scripts\win\*' -Destination $stagingDir -Recurse
 
       - name: Download JRE (Windows)
@@ -83,7 +82,7 @@ jobs:
           echo "APP_JAR=$(basename "$jar")" >> $GITHUB_ENV
 
           mkdir -p dist staging
-          cp "$jar" README.md LICENSE staging/
+          cp "$jar" README.md staging/
           cp scripts/linux/* staging/
 
       - name: Download JRE (Linux)

@@ -1,10 +1,11 @@
 /*
  * Copyright (c) 2026, 梦里不知身是客
- * Licensed under the MIT License
  */
 package com.tlcsdm.pasori.controller;
 
 import com.fazecast.jSerialComm.SerialPort;
+import com.tlcsdm.pasori.config.AppSettings;
+import com.tlcsdm.pasori.config.I18N;
 import com.tlcsdm.pasori.model.LogEntry;
 import com.tlcsdm.pasori.model.SerialPortConfig;
 import com.tlcsdm.pasori.service.CommunicationBridgeService;
@@ -17,6 +18,7 @@ import javafx.fxml.Initializable;
 import javafx.scene.control.*;
 import javafx.scene.paint.Color;
 import javafx.scene.shape.Circle;
+import javafx.stage.Stage;
 
 import java.net.URL;
 import java.util.ResourceBundle;
@@ -63,6 +65,9 @@ public class MainController implements Initializable {
     private final ObservableList<String> logItems;
     private final ObservableList<Integer> baudRates;
 
+    private Stage primaryStage;
+    private ResourceBundle resources;
+
     private static final int MAX_LOG_ENTRIES = 1000;
 
     public MainController() {
@@ -73,8 +78,17 @@ public class MainController implements Initializable {
         );
     }
 
+    /**
+     * Set the primary stage reference for settings dialog.
+     */
+    public void setPrimaryStage(Stage stage) {
+        this.primaryStage = stage;
+    }
+
     @Override
     public void initialize(URL location, ResourceBundle resources) {
+        this.resources = resources;
+
         // Setup baud rate options
         pasoriBaudCombo.setItems(baudRates);
         pasoriBaudCombo.setValue(115200);
@@ -100,7 +114,44 @@ public class MainController implements Initializable {
         sendToPasoriRadio.setUserData("pasori");
         sendToAntennaRadio.setUserData("antenna");
 
-        addLogEntry("[System] Application started - PaSoRi IF Tool");
+        addLogEntry("[System] " + I18N.get("system.appStarted"));
+
+        // Register for settings changes
+        AppSettings.getInstance().setOnSettingsChanged(this::onLanguageChanged);
+    }
+
+    private void onLanguageChanged() {
+        // Show restart required message
+        Platform.runLater(() -> {
+            Alert alert = new Alert(Alert.AlertType.INFORMATION);
+            alert.setTitle(I18N.get("settings.title"));
+            alert.setHeaderText(null);
+            alert.setContentText(I18N.get("system.restartRequired"));
+            alert.showAndWait();
+        });
+    }
+
+    @FXML
+    private void handleOpenSettings() {
+        AppSettings.getInstance().getPreferencesFx().show(true);
+    }
+
+    @FXML
+    private void handleExit() {
+        shutdown();
+        if (primaryStage != null) {
+            primaryStage.close();
+        }
+        Platform.exit();
+    }
+
+    @FXML
+    private void handleAbout() {
+        Alert alert = new Alert(Alert.AlertType.INFORMATION);
+        alert.setTitle(I18N.get("menu.about"));
+        alert.setHeaderText("PaSoRi IF Tool");
+        alert.setContentText(I18N.get("about.version") + "\n\n" + I18N.get("about.description"));
+        alert.showAndWait();
     }
 
     @FXML
@@ -114,7 +165,7 @@ public class MainController implements Initializable {
         Integer baudRate = pasoriBaudCombo.getValue();
 
         if (portName == null || portName.isEmpty()) {
-            showAlert("Error", "Please select a port for PaSoRi");
+            showAlert(I18N.get("error.title"), I18N.get("error.selectPasoriPort"));
             return;
         }
 
@@ -124,9 +175,9 @@ public class MainController implements Initializable {
 
         if (bridgeService.connectPaSoRi(config)) {
             updateConnectionButtons();
-            updateStatusIndicator(pasoriStatusIndicator, pasoriStatusLabel, true, "Connected");
+            updateStatusIndicator(pasoriStatusIndicator, pasoriStatusLabel, true, I18N.get("pasori.connected"));
         } else {
-            showAlert("Connection Error", "Failed to connect to PaSoRi on " + portName);
+            showAlert(I18N.get("error.connectionError"), I18N.get("error.pasoriConnectFailed", portName));
         }
     }
 
@@ -134,7 +185,7 @@ public class MainController implements Initializable {
     private void handlePasoriDisconnect() {
         bridgeService.disconnectPaSoRi();
         updateConnectionButtons();
-        updateStatusIndicator(pasoriStatusIndicator, pasoriStatusLabel, false, "Disconnected");
+        updateStatusIndicator(pasoriStatusIndicator, pasoriStatusLabel, false, I18N.get("pasori.disconnected"));
     }
 
     @FXML
@@ -143,7 +194,7 @@ public class MainController implements Initializable {
         Integer baudRate = antennaBaudCombo.getValue();
 
         if (portName == null || portName.isEmpty()) {
-            showAlert("Error", "Please select a port for アンテナIF");
+            showAlert(I18N.get("error.title"), I18N.get("error.selectAntennaPort"));
             return;
         }
 
@@ -153,9 +204,9 @@ public class MainController implements Initializable {
 
         if (bridgeService.connectAntennaIf(config)) {
             updateConnectionButtons();
-            updateStatusIndicator(antennaStatusIndicator, antennaStatusLabel, true, "Connected");
+            updateStatusIndicator(antennaStatusIndicator, antennaStatusLabel, true, I18N.get("antenna.connected"));
         } else {
-            showAlert("Connection Error", "Failed to connect to アンテナIF on " + portName);
+            showAlert(I18N.get("error.connectionError"), I18N.get("error.antennaConnectFailed", portName));
         }
     }
 
@@ -163,14 +214,14 @@ public class MainController implements Initializable {
     private void handleAntennaDisconnect() {
         bridgeService.disconnectAntennaIf();
         updateConnectionButtons();
-        updateStatusIndicator(antennaStatusIndicator, antennaStatusLabel, false, "Disconnected");
+        updateStatusIndicator(antennaStatusIndicator, antennaStatusLabel, false, I18N.get("antenna.disconnected"));
     }
 
     @FXML
     private void handleBridgeToggle() {
         boolean enabled = bridgeToggle.isSelected();
         bridgeService.setBridgingEnabled(enabled);
-        bridgeToggle.setText(enabled ? "Bridge ON" : "Bridge OFF");
+        bridgeToggle.setText(enabled ? I18N.get("bridge.on") : I18N.get("bridge.off"));
     }
 
     @FXML
@@ -182,7 +233,7 @@ public class MainController implements Initializable {
     private void handleSendData() {
         String hexInput = sendDataField.getText().trim();
         if (hexInput.isEmpty()) {
-            showAlert("Error", "Please enter hex data to send");
+            showAlert(I18N.get("error.title"), I18N.get("error.enterHexData"));
             return;
         }
 
@@ -190,13 +241,13 @@ public class MainController implements Initializable {
         try {
             data = hexStringToByteArray(hexInput);
         } catch (IllegalArgumentException e) {
-            showAlert("Error", "Invalid hex format. Use format: 00 A1 FF or 00A1FF");
+            showAlert(I18N.get("error.title"), I18N.get("error.invalidHexFormat"));
             return;
         }
 
         Toggle selectedToggle = sendTargetGroup.getSelectedToggle();
         if (selectedToggle == null) {
-            showAlert("Error", "Please select a target device");
+            showAlert(I18N.get("error.title"), I18N.get("error.selectTargetDevice"));
             return;
         }
 
@@ -204,13 +255,13 @@ public class MainController implements Initializable {
         int result;
         if ("pasori".equals(target)) {
             if (!bridgeService.isPaSoRiConnected()) {
-                showAlert("Error", "PaSoRi is not connected");
+                showAlert(I18N.get("error.title"), I18N.get("error.pasoriNotConnected"));
                 return;
             }
             result = bridgeService.sendToPaSoRi(data);
         } else {
             if (!bridgeService.isAntennaIfConnected()) {
-                showAlert("Error", "アンテナIF is not connected");
+                showAlert(I18N.get("error.title"), I18N.get("error.antennaNotConnected"));
                 return;
             }
             result = bridgeService.sendToAntennaIf(data);
@@ -243,9 +294,9 @@ public class MainController implements Initializable {
         // Add port descriptions to log
         SerialPort[] ports = SerialPortService.getAvailablePorts();
         if (ports.length == 0) {
-            addLogEntry("[System] No serial ports found");
+            addLogEntry("[System] " + I18N.get("system.noPortsFound"));
         } else {
-            addLogEntry("[System] Found " + ports.length + " serial port(s):");
+            addLogEntry("[System] " + I18N.get("system.portsFound", ports.length));
             for (SerialPort port : ports) {
                 addLogEntry("[System]   - " + port.getSystemPortName() + " (" + port.getDescriptivePortName() + ")");
             }

@@ -66,7 +66,3 @@ The tool acts as a transparent bridge:
 - Data received from アンテナIF → forwarded to PaSoRi
 
 All communication is logged with timestamps and direction indicators for debugging purposes.
-
-## License
-
-MIT License - see [LICENSE](LICENSE) for details.

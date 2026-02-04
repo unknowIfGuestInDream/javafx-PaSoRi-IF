@@ -1,9 +1,10 @@
 /*
  * Copyright (c) 2026, 梦里不知身是客
- * Licensed under the MIT License
  */
 package com.tlcsdm.pasori;
 
+import com.tlcsdm.pasori.config.AppSettings;
+import com.tlcsdm.pasori.config.I18N;
 import com.tlcsdm.pasori.controller.MainController;
 import javafx.application.Application;
 import javafx.fxml.FXMLLoader;
@@ -25,14 +26,23 @@ public class PaSoRiApplication extends Application {
     private MainController controller;
 
     @Override
+    public void init() {
+        // Apply saved theme before UI is created
+        AppSettings.getInstance().applyInitialSettings();
+    }
+
+    @Override
     public void start(Stage primaryStage) throws IOException {
         FXMLLoader loader = new FXMLLoader(getClass().getResource("main.fxml"));
+        loader.setResources(java.util.ResourceBundle.getBundle(
+            "com.tlcsdm.pasori.i18n.messages", I18N.getCurrentLocale()));
         Parent root = loader.load();
         controller = loader.getController();
+        controller.setPrimaryStage(primaryStage);
         
         Scene scene = new Scene(root, 900, 700);
         
-        primaryStage.setTitle("PaSoRi IF Tool - Serial Communication Bridge");
+        primaryStage.setTitle(I18N.get("app.title"));
         primaryStage.setScene(scene);
         primaryStage.setMinWidth(800);
         primaryStage.setMinHeight(600);
