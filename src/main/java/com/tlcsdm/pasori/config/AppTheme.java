@@ -15,11 +15,11 @@ import java.util.function.Supplier;
 
 /**
  * Theme configuration for the application.
- * Supports JavaFX default theme and AtlantaFX themes.
+ * Supports AtlantaFX themes only to avoid CSS variable resolution issues
+ * when switching between different theme families (e.g., from Modena to AtlantaFX).
  */
 public enum AppTheme {
     
-    LIGHT("settings.theme.light", null),
     ATLANTAFX_PRIMER_LIGHT("settings.theme.atlantafx.primerLight", PrimerLight::new),
     ATLANTAFX_PRIMER_DARK("settings.theme.atlantafx.primerDark", PrimerDark::new),
     ATLANTAFX_NORD_LIGHT("settings.theme.atlantafx.nordLight", NordLight::new),
@@ -54,12 +54,7 @@ public enum AppTheme {
      * Apply this theme to the application.
      */
     public void apply() {
-        if (themeSupplier != null) {
-            Application.setUserAgentStylesheet(themeSupplier.get().getUserAgentStylesheet());
-        } else {
-            // Reset to default JavaFX theme
-            Application.setUserAgentStylesheet(null);
-        }
+        Application.setUserAgentStylesheet(themeSupplier.get().getUserAgentStylesheet());
     }
 
     /**
