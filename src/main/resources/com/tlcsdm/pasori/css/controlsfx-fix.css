@@ -1,0 +1,27 @@
+/*
+ * CSS fixes for ControlsFX compatibility with AtlantaFX themes.
+ * This file resolves CSS variable resolution warnings when using ControlsFX
+ * controls (like ToggleSwitch) with AtlantaFX themes.
+ */
+
+.root {
+    /* Define the missing -fx-text-base-color that ControlsFX expects */
+    -fx-text-base-color: -color-fg-default;
+}
+
+/* Fix ToggleSwitch styling to work with AtlantaFX */
+.toggle-switch .label {
+    -fx-text-fill: -color-fg-default;
+}
+
+.toggle-switch .thumb-area {
+    -fx-background-color: -color-border-default;
+}
+
+.toggle-switch:selected .thumb-area {
+    -fx-background-color: -color-accent-emphasis;
+}
+
+.toggle-switch .thumb {
+    -fx-background-color: -color-bg-default;
+}

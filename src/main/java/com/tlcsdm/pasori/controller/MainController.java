@@ -82,6 +82,7 @@ public class MainController implements Initializable {
 
     private static final int MAX_LOG_ENTRIES = 1000;
     private static final String ICON_PATH = "/com/tlcsdm/pasori/images/logo.png";
+    private static final String CONTROLSFX_CSS_FIX_PATH = "/com/tlcsdm/pasori/css/controlsfx-fix.css";
 
     public MainController() {
         this.bridgeService = new CommunicationBridgeService();
@@ -157,13 +158,14 @@ public class MainController implements Initializable {
     private void handleOpenSettings() {
         var preferencesFx = AppSettings.getInstance().getPreferencesFx();
         
-        // Add listener to set icon when the settings dialog window appears
+        // Add listener to set icon and apply CSS fix when the settings dialog window appears
         ListChangeListener<Window> windowListener = change -> {
             while (change.next()) {
                 if (change.wasAdded()) {
                     for (Window window : change.getAddedSubList()) {
                         if (window instanceof Stage stage && stage != primaryStage) {
                             setDialogIcon(stage);
+                            applyControlsFxCssFix(stage);
                         }
                     }
                 }
@@ -476,6 +478,18 @@ public class MainController implements Initializable {
             }
         } catch (Exception e) {
             // Ignore if icon cannot be loaded
+        }
+    }
+
+    /**
+     * Apply CSS fix for ControlsFX components (like ToggleSwitch) to work with AtlantaFX themes.
+     */
+    private void applyControlsFxCssFix(Stage stage) {
+        if (stage.getScene() != null) {
+            var cssUrl = getClass().getResource(CONTROLSFX_CSS_FIX_PATH);
+            if (cssUrl != null) {
+                stage.getScene().getStylesheets().add(cssUrl.toExternalForm());
+            }
         }
     }
 
