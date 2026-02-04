@@ -10,9 +10,11 @@ import javafx.application.Application;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
+import javafx.scene.image.Image;
 import javafx.stage.Stage;
 
 import java.io.IOException;
+import java.io.InputStream;
 
 /**
  * Main JavaFX Application for PaSoRi-IF serial communication tool.
@@ -46,6 +48,14 @@ public class PaSoRiApplication extends Application {
         primaryStage.setScene(scene);
         primaryStage.setMinWidth(800);
         primaryStage.setMinHeight(600);
+        
+        // Set application icon
+        try (InputStream iconStream = getClass().getResourceAsStream("images/logo.png")) {
+            if (iconStream != null) {
+                primaryStage.getIcons().add(new Image(iconStream));
+            }
+        }
+        
         primaryStage.setOnCloseRequest(event -> {
             if (controller != null) {
                 controller.shutdown();
