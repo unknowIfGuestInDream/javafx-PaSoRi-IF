@@ -148,20 +148,24 @@ public class MainController implements Initializable {
 
     @FXML
     private void handleRestart() {
-        shutdown();
-        if (primaryStage != null) {
-            primaryStage.close();
-        }
         Platform.runLater(() -> {
+            shutdown();
+            if (primaryStage != null) {
+                primaryStage.close();
+            }
             try {
                 PaSoRiApplication app = new PaSoRiApplication();
                 app.init();
                 app.start(new Stage());
             } catch (Exception e) {
+                String errorMessage = e.getMessage();
+                if (errorMessage == null || errorMessage.isEmpty()) {
+                    errorMessage = e.toString();
+                }
                 Alert alert = new Alert(Alert.AlertType.ERROR);
                 alert.setTitle(I18N.get("error.title"));
                 alert.setHeaderText(null);
-                alert.setContentText(I18N.get("error.restartFailed") + "\n" + e.getMessage());
+                alert.setContentText(I18N.get("error.restartFailed") + "\n" + errorMessage);
                 alert.showAndWait();
                 Platform.exit();
             }
