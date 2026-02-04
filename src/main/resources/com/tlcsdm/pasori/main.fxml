@@ -1,0 +1,110 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+<?import javafx.scene.shape.Circle?>
+
+<VBox xmlns:fx="http://javafx.com/fxml/1"
+      xmlns="http://javafx.com/javafx/21"
+      fx:controller="com.tlcsdm.pasori.controller.MainController"
+      spacing="10" prefWidth="900" prefHeight="700">
+    <padding>
+        <Insets top="10" right="10" bottom="10" left="10"/>
+    </padding>
+
+    <!-- Header -->
+    <HBox alignment="CENTER">
+        <Label text="PaSoRi IF Tool - Serial Communication Bridge" style="-fx-font-size: 18px; -fx-font-weight: bold;"/>
+    </HBox>
+
+    <!-- Connection Panels -->
+    <HBox spacing="20" VBox.vgrow="NEVER">
+        <!-- PaSoRi Connection Panel -->
+        <VBox spacing="10" HBox.hgrow="ALWAYS" style="-fx-border-color: #ccc; -fx-border-radius: 5; -fx-padding: 10;">
+            <HBox alignment="CENTER_LEFT" spacing="10">
+                <Label text="PaSoRi Device" style="-fx-font-weight: bold; -fx-font-size: 14px;"/>
+                <Circle fx:id="pasoriStatusIndicator" radius="6" fill="GRAY"/>
+                <Label fx:id="pasoriStatusLabel" text="Disconnected"/>
+            </HBox>
+            
+            <HBox spacing="10" alignment="CENTER_LEFT">
+                <Label text="Port:" prefWidth="50"/>
+                <ComboBox fx:id="pasoriPortCombo" prefWidth="150" promptText="Select port"/>
+            </HBox>
+            
+            <HBox spacing="10" alignment="CENTER_LEFT">
+                <Label text="Baud:" prefWidth="50"/>
+                <ComboBox fx:id="pasoriBaudCombo" prefWidth="150"/>
+            </HBox>
+            
+            <HBox spacing="10">
+                <Button fx:id="pasoriConnectBtn" text="Connect" onAction="#handlePasoriConnect" prefWidth="80"/>
+                <Button fx:id="pasoriDisconnectBtn" text="Disconnect" onAction="#handlePasoriDisconnect" prefWidth="80" disable="true"/>
+            </HBox>
+        </VBox>
+
+        <!-- Bridge Control Panel -->
+        <VBox spacing="10" alignment="CENTER" style="-fx-border-color: #ccc; -fx-border-radius: 5; -fx-padding: 10;">
+            <Label text="Bridge Control" style="-fx-font-weight: bold; -fx-font-size: 14px;"/>
+            <ToggleButton fx:id="bridgeToggle" text="Bridge OFF" onAction="#handleBridgeToggle" 
+                          prefWidth="100" prefHeight="40" disable="true"/>
+            <Button fx:id="refreshPortsBtn" text="Refresh Ports" onAction="#handleRefreshPorts"/>
+        </VBox>
+
+        <!-- アンテナIF Connection Panel -->
+        <VBox spacing="10" HBox.hgrow="ALWAYS" style="-fx-border-color: #ccc; -fx-border-radius: 5; -fx-padding: 10;">
+            <HBox alignment="CENTER_LEFT" spacing="10">
+                <Label text="Panasonic アンテナIF (USB CDC-ACM)" style="-fx-font-weight: bold; -fx-font-size: 14px;"/>
+                <Circle fx:id="antennaStatusIndicator" radius="6" fill="GRAY"/>
+                <Label fx:id="antennaStatusLabel" text="Disconnected"/>
+            </HBox>
+            
+            <HBox spacing="10" alignment="CENTER_LEFT">
+                <Label text="Port:" prefWidth="50"/>
+                <ComboBox fx:id="antennaPortCombo" prefWidth="150" promptText="Select port"/>
+            </HBox>
+            
+            <HBox spacing="10" alignment="CENTER_LEFT">
+                <Label text="Baud:" prefWidth="50"/>
+                <ComboBox fx:id="antennaBaudCombo" prefWidth="150"/>
+            </HBox>
+            
+            <HBox spacing="10">
+                <Button fx:id="antennaConnectBtn" text="Connect" onAction="#handleAntennaConnect" prefWidth="80"/>
+                <Button fx:id="antennaDisconnectBtn" text="Disconnect" onAction="#handleAntennaDisconnect" prefWidth="80" disable="true"/>
+            </HBox>
+        </VBox>
+    </HBox>
+
+    <!-- Communication Log -->
+    <VBox spacing="5" VBox.vgrow="ALWAYS" style="-fx-border-color: #ccc; -fx-border-radius: 5; -fx-padding: 10;">
+        <HBox alignment="CENTER_LEFT" spacing="10">
+            <Label text="Communication Log" style="-fx-font-weight: bold; -fx-font-size: 14px;"/>
+            <Region HBox.hgrow="ALWAYS"/>
+            <CheckBox fx:id="autoScrollCheck" text="Auto-scroll" selected="true"/>
+            <Button fx:id="clearLogBtn" text="Clear" onAction="#handleClearLog"/>
+        </HBox>
+        
+        <ListView fx:id="logListView" VBox.vgrow="ALWAYS" style="-fx-font-family: monospace;"/>
+    </VBox>
+
+    <!-- Manual Send Panel -->
+    <VBox spacing="5" style="-fx-border-color: #ccc; -fx-border-radius: 5; -fx-padding: 10;">
+        <Label text="Manual Data Send (Hex format: 00 A1 FF)" style="-fx-font-weight: bold; -fx-font-size: 14px;"/>
+        <HBox spacing="10" alignment="CENTER_LEFT">
+            <TextField fx:id="sendDataField" HBox.hgrow="ALWAYS" promptText="Enter hex data (e.g., 00 A1 FF B3)"/>
+            <fx:define>
+                <ToggleGroup fx:id="sendTargetGroup"/>
+            </fx:define>
+            <RadioButton fx:id="sendToPasoriRadio" text="To PaSoRi" toggleGroup="$sendTargetGroup" selected="true"/>
+            <RadioButton fx:id="sendToAntennaRadio" text="To アンテナIF" toggleGroup="$sendTargetGroup"/>
+            <Button fx:id="sendBtn" text="Send" onAction="#handleSendData" prefWidth="80"/>
+        </HBox>
+    </VBox>
+
+    <!-- Footer / Status Bar -->
+    <HBox alignment="CENTER" style="-fx-background-color: #f0f0f0; -fx-padding: 5;">
+        <Label text="Use this tool to bridge communication between PaSoRi SDK and Panasonic USB CDC-ACM (アンテナIF仕様) devices"/>
+    </HBox>
+</VBox>
