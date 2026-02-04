@@ -88,17 +88,19 @@ public class CommunicationBridgeService {
                 try {
                     QueuedMessage message = pasoriToAntennaQueue.poll(100, TimeUnit.MILLISECONDS);
                     if (message != null && antennaIfService.isConnected()) {
-                        antennaIfService.sendData(message.data);
+                        try {
+                            int bytesWritten = antennaIfService.sendData(message.data);
+                            if (bytesWritten < 0) {
+                                // Send failed, re-queue with retry limit
+                                requeue(message, pasoriToAntennaQueue, "Antenna");
+                            }
+                        } catch (Exception e) {
+                            // Send failed, re-queue with retry limit
+                            requeue(message, pasoriToAntennaQueue, "Antenna");
+                        }
                     } else if (message != null) {
                         // Re-queue if antenna is not connected, with retry limit
-                        message.retryCount++;
-                        if (message.retryCount < MAX_RETRY_ATTEMPTS) {
-                            pasoriToAntennaQueue.offer(message);
-                            // Brief sleep to prevent busy-waiting
-                            Thread.sleep(50);
-                        } else {
-                            log(LogEntry.Direction.SYSTEM, "Message to Antenna discarded after max retries");
-                        }
+                        requeue(message, pasoriToAntennaQueue, "Antenna");
                     }
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
@@ -113,17 +115,19 @@ public class CommunicationBridgeService {
                 try {
                     QueuedMessage message = antennaToPasoriQueue.poll(100, TimeUnit.MILLISECONDS);
                     if (message != null && pasoriService.isConnected()) {
-                        pasoriService.sendData(message.data);
+                        try {
+                            int bytesWritten = pasoriService.sendData(message.data);
+                            if (bytesWritten < 0) {
+                                // Send failed, re-queue with retry limit
+                                requeue(message, antennaToPasoriQueue, "PaSoRi");
+                            }
+                        } catch (Exception e) {
+                            // Send failed, re-queue with retry limit
+                            requeue(message, antennaToPasoriQueue, "PaSoRi");
+                        }
                     } else if (message != null) {
                         // Re-queue if PaSoRi is not connected, with retry limit
-                        message.retryCount++;
-                        if (message.retryCount < MAX_RETRY_ATTEMPTS) {
-                            antennaToPasoriQueue.offer(message);
-                            // Brief sleep to prevent busy-waiting
-                            Thread.sleep(50);
-                        } else {
-                            log(LogEntry.Direction.SYSTEM, "Message to PaSoRi discarded after max retries");
-                        }
+                        requeue(message, antennaToPasoriQueue, "PaSoRi");
                     }
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
@@ -131,6 +135,29 @@ public class CommunicationBridgeService {
                 }
             }
         });
+    }
+    
+    /**
+     * Re-queue a message with retry limit checking.
+     * 
+     * @param message the message to re-queue
+     * @param queue the queue to add the message to
+     * @param targetName the name of the target device for logging
+     */
+    private void requeue(QueuedMessage message, BlockingQueue<QueuedMessage> queue, String targetName) {
+        message.retryCount++;
+        if (message.retryCount < MAX_RETRY_ATTEMPTS) {
+            queue.offer(message);
+            try {
+                // Brief sleep to prevent busy-waiting
+                Thread.sleep(50);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+        } else {
+            log(LogEntry.Direction.SYSTEM, 
+                "Message to " + targetName + " discarded after max retries (size: " + message.data.length + " bytes)");
+        }
     }
 
     private void setupCallbacks() {
