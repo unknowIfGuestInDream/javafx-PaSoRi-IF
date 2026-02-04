@@ -86,7 +86,7 @@ public class AppSettings {
         List<Locale> supportedLocales = Arrays.asList(I18N.getSupportedLocales());
         List<AppTheme> themes = Arrays.asList(AppTheme.values());
 
-        preferencesFx = PreferencesFx.of(AppSettings.class,
+        preferencesFx = PreferencesFx.of(new CenteredStorageHandler(AppSettings.class),
             Category.of(I18N.get("settings.general"),
                 Group.of(I18N.get("settings.appearance"),
                     Setting.of(I18N.get("settings.language"),
