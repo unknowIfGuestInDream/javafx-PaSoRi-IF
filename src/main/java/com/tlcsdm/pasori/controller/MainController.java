@@ -4,6 +4,7 @@
 package com.tlcsdm.pasori.controller;
 
 import com.fazecast.jSerialComm.SerialPort;
+import com.tlcsdm.pasori.PaSoRiApplication;
 import com.tlcsdm.pasori.config.AppSettings;
 import com.tlcsdm.pasori.config.I18N;
 import com.tlcsdm.pasori.model.LogEntry;
@@ -143,6 +144,22 @@ public class MainController implements Initializable {
             primaryStage.close();
         }
         Platform.exit();
+    }
+
+    @FXML
+    private void handleRestart() {
+        shutdown();
+        if (primaryStage != null) {
+            primaryStage.close();
+        }
+        Platform.runLater(() -> {
+            try {
+                new PaSoRiApplication().start(new Stage());
+            } catch (Exception e) {
+                // If restart fails, exit the application
+                Platform.exit();
+            }
+        });
     }
 
     @FXML
