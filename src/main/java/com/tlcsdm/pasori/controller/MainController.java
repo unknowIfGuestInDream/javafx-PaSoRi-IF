@@ -7,6 +7,7 @@ import com.fazecast.jSerialComm.SerialPort;
 import com.tlcsdm.pasori.PaSoRiApplication;
 import com.tlcsdm.pasori.config.AppSettings;
 import com.tlcsdm.pasori.config.I18N;
+import com.tlcsdm.pasori.model.LogEntry;
 import com.tlcsdm.pasori.model.SerialPortConfig;
 import com.tlcsdm.pasori.service.CommunicationBridgeService;
 import com.tlcsdm.pasori.service.SerialPortService;
@@ -18,10 +19,13 @@ import javafx.fxml.FXML;
 import javafx.fxml.Initializable;
 import javafx.scene.control.*;
 import javafx.scene.image.Image;
+import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
 import javafx.scene.shape.Circle;
 import javafx.stage.Stage;
 import javafx.stage.Window;
+import org.fxmisc.flowless.VirtualizedScrollPane;
+import org.fxmisc.richtext.InlineCssTextArea;
 
 import java.io.InputStream;
 
@@ -56,6 +60,7 @@ public class MainController implements Initializable {
 
     // Communication log
     @FXML private TextArea logTextArea;
+    @FXML private VBox logContainer;
     @FXML private Button clearLogBtn;
     @FXML private CheckBox autoScrollCheck;
 
@@ -72,6 +77,8 @@ public class MainController implements Initializable {
     private Stage primaryStage;
     private ResourceBundle resources;
     private int logLineCount = 0;
+    private InlineCssTextArea styledLogArea;
+    private VirtualizedScrollPane<InlineCssTextArea> logScrollPane;
 
     private static final int MAX_LOG_ENTRIES = 1000;
     private static final String ICON_PATH = "/com/tlcsdm/pasori/images/logo.png";
@@ -100,14 +107,13 @@ public class MainController implements Initializable {
         antennaBaudCombo.setItems(baudRates);
         antennaBaudCombo.setValue(115200);
 
-        // Setup log text area (read-only but selectable for copying)
-        logTextArea.setEditable(false);
-        logTextArea.setWrapText(true);
+        // Setup styled log area for colored logs
+        setupStyledLogArea();
         autoScrollCheck.setSelected(true);
 
         // Setup bridge service log callback
         bridgeService.setLogCallback(entry -> 
-            Platform.runLater(() -> addLogEntry(entry.toString()))
+            Platform.runLater(() -> addLogEntry(entry))
         );
 
         // Initial port refresh
@@ -120,7 +126,31 @@ public class MainController implements Initializable {
         sendToPasoriRadio.setUserData("pasori");
         sendToAntennaRadio.setUserData("antenna");
 
-        addLogEntry("[System] " + I18N.get("system.appStarted"));
+        addLogEntry(new LogEntry(LogEntry.Direction.SYSTEM, I18N.get("system.appStarted"), false));
+    }
+
+    /**
+     * Setup the styled log area for colored log display.
+     */
+    private void setupStyledLogArea() {
+        // Create inline CSS styled text area for colored logs
+        styledLogArea = new InlineCssTextArea();
+        styledLogArea.setEditable(false);
+        styledLogArea.setWrapText(true);
+        styledLogArea.setStyle("-fx-font-family: monospace; -fx-font-size: 12px;");
+        
+        // Create scroll pane wrapper
+        logScrollPane = new VirtualizedScrollPane<>(styledLogArea);
+        VBox.setVgrow(logScrollPane, javafx.scene.layout.Priority.ALWAYS);
+        
+        // Replace the placeholder TextArea with our styled area
+        // This approach is used because RichTextFX components cannot be directly declared in FXML
+        if (logTextArea != null && logTextArea.getParent() instanceof VBox parent) {
+            int index = parent.getChildren().indexOf(logTextArea);
+            if (index >= 0) {
+                parent.getChildren().set(index, logScrollPane);
+            }
+        }
     }
 
     @FXML
@@ -268,7 +298,7 @@ public class MainController implements Initializable {
 
     @FXML
     private void handleClearLog() {
-        logTextArea.clear();
+        styledLogArea.clear();
         logLineCount = 0;
     }
 
@@ -337,11 +367,12 @@ public class MainController implements Initializable {
         // Add port descriptions to log
         SerialPort[] ports = SerialPortService.getAvailablePorts();
         if (ports.length == 0) {
-            addLogEntry("[System] " + I18N.get("system.noPortsFound"));
+            addLogEntry(new LogEntry(LogEntry.Direction.SYSTEM, I18N.get("system.noPortsFound"), false));
         } else {
-            addLogEntry("[System] " + I18N.get("system.portsFound", ports.length));
+            addLogEntry(new LogEntry(LogEntry.Direction.SYSTEM, I18N.get("system.portsFound", ports.length), false));
             for (SerialPort port : ports) {
-                addLogEntry("[System]   - " + port.getSystemPortName() + " (" + port.getDescriptivePortName() + ")");
+                addLogEntry(new LogEntry(LogEntry.Direction.SYSTEM, 
+                    "  - " + port.getSystemPortName() + " (" + port.getDescriptivePortName() + ")", false));
             }
         }
     }
@@ -368,30 +399,42 @@ public class MainController implements Initializable {
         label.setText(text);
     }
 
-    private void addLogEntry(String entry) {
+    private void addLogEntry(LogEntry entry) {
         logLineCount++;
         
         // Limit log size - trim from the beginning if too many entries
         if (logLineCount > MAX_LOG_ENTRIES) {
-            String text = logTextArea.getText();
+            String text = styledLogArea.getText();
             int firstNewline = text.indexOf('\n');
             if (firstNewline >= 0) {
-                logTextArea.setText(text.substring(firstNewline + 1));
+                styledLogArea.deleteText(0, firstNewline + 1);
             }
             logLineCount--;
         }
 
-        // Append new entry
-        if (logTextArea.getText().isEmpty()) {
-            logTextArea.setText(entry);
-        } else {
-            logTextArea.appendText("\n" + entry);
+        // Get the color for this log entry
+        String colorHex = AppSettings.getInstance().getLogColorHex(entry.getDirection());
+        boolean showTimestamp = AppSettings.getInstance().isLogTimestampEnabled();
+        String logText = entry.toString(showTimestamp);
+        
+        // Add newline if not the first entry
+        int startPos = styledLogArea.getLength();
+        if (startPos > 0) {
+            styledLogArea.appendText("\n");
+            startPos = styledLogArea.getLength();
         }
+        
+        // Append the log text with inline color styling
+        styledLogArea.appendText(logText);
+        int endPos = styledLogArea.getLength();
+        
+        // Apply color style to the appended text
+        styledLogArea.setStyle(startPos, endPos, "-fx-fill: " + colorHex + ";");
 
         // Auto scroll to bottom
         if (autoScrollCheck.isSelected()) {
-            logTextArea.setScrollTop(Double.MAX_VALUE);
-            logTextArea.end();
+            styledLogArea.requestFollowCaret();
+            styledLogArea.moveTo(styledLogArea.getLength());
         }
     }
 

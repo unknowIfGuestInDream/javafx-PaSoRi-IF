@@ -3,6 +3,8 @@
  */
 package com.tlcsdm.pasori.model;
 
+import com.tlcsdm.pasori.config.I18N;
+
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 
@@ -14,18 +16,22 @@ public class LogEntry {
     private static final DateTimeFormatter FORMATTER = DateTimeFormatter.ofPattern("HH:mm:ss.SSS");
 
     public enum Direction {
-        PASORI_TO_ANTENNA("PaSoRi → アンテナIF"),
-        ANTENNA_TO_PASORI("アンテナIF → PaSoRi"),
-        SYSTEM("System");
+        PASORI_TO_ANTENNA("log.direction.pasoriToAntenna"),
+        ANTENNA_TO_PASORI("log.direction.antennaToPasori"),
+        SYSTEM("log.direction.system");
 
-        private final String displayName;
+        private final String i18nKey;
 
-        Direction(String displayName) {
-            this.displayName = displayName;
+        Direction(String i18nKey) {
+            this.i18nKey = i18nKey;
         }
 
         public String getDisplayName() {
-            return displayName;
+            return I18N.get(i18nKey);
+        }
+
+        public String getI18nKey() {
+            return i18nKey;
         }
     }
 
@@ -64,12 +70,32 @@ public class LogEntry {
         return isHex;
     }
 
+    public String getFormattedTimestamp() {
+        return timestamp.format(FORMATTER);
+    }
+
+    /**
+     * Converts the log entry to a string.
+     *
+     * @param showTimestamp whether to include the timestamp
+     * @return the formatted log entry string
+     */
+    public String toString(boolean showTimestamp) {
+        if (showTimestamp) {
+            return String.format("[%s] [%s] %s", 
+                timestamp.format(FORMATTER), 
+                direction.getDisplayName(), 
+                data);
+        } else {
+            return String.format("[%s] %s", 
+                direction.getDisplayName(), 
+                data);
+        }
+    }
+
     @Override
     public String toString() {
-        return String.format("[%s] [%s] %s", 
-            timestamp.format(FORMATTER), 
-            direction.getDisplayName(), 
-            data);
+        return toString(true);
     }
 
     private static String bytesToHex(byte[] bytes) {
