@@ -76,7 +76,7 @@ public class LogEntry {
 
     /**
      * Converts the log entry to a string.
-     * 
+     *
      * @param showTimestamp whether to include the timestamp
      * @return the formatted log entry string
      */

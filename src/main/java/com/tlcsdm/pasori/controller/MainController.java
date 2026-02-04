@@ -143,11 +143,13 @@ public class MainController implements Initializable {
         logScrollPane = new VirtualizedScrollPane<>(styledLogArea);
         VBox.setVgrow(logScrollPane, javafx.scene.layout.Priority.ALWAYS);
         
-        // Find and replace TextArea with our styled area
+        // Replace the placeholder TextArea with our styled area
+        // This approach is used because RichTextFX components cannot be directly declared in FXML
         if (logTextArea != null && logTextArea.getParent() instanceof VBox parent) {
             int index = parent.getChildren().indexOf(logTextArea);
-            parent.getChildren().remove(logTextArea);
-            parent.getChildren().add(index, logScrollPane);
+            if (index >= 0) {
+                parent.getChildren().set(index, logScrollPane);
+            }
         }
     }
 
