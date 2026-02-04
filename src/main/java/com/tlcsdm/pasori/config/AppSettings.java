@@ -210,8 +210,8 @@ public class AppSettings {
         ).persistWindowState(true)
          .saveSettings(true)
          .debugHistoryMode(false)
-         .buttonsVisibility(true)
-         .instantPersistent(false);
+         .buttonsVisibility(false)
+         .instantPersistent(true);
     }
 
     private void rebuildPreferences() {

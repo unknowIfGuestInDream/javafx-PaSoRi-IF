@@ -13,7 +13,7 @@ import java.time.format.DateTimeFormatter;
  */
 public class LogEntry {
 
-    private static final DateTimeFormatter FORMATTER = DateTimeFormatter.ofPattern("HH:mm:ss.SSS");
+    private static final DateTimeFormatter FORMATTER = DateTimeFormatter.ofPattern("HH:mm:ss");
 
     public enum Direction {
         PASORI_TO_ANTENNA("log.direction.pasoriToAntenna"),
