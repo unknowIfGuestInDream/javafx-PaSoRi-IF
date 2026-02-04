@@ -4,12 +4,12 @@ JavaFX tool for serial communication bridging between PaSoRi device and Panasoni
 
 ## Requirements
 
-- JDK 21 or later
+- JDK 17 or later
 - Maven 3.6 or later
 
 ## Dependencies
 
-- JavaFX 21
+- JavaFX 17
 - jSerialComm 2.10.4
 
 ## Features
@@ -66,3 +66,12 @@ The tool acts as a transparent bridge:
 - Data received from アンテナIF → forwarded to PaSoRi
 
 All communication is logged with timestamps and direction indicators for debugging purposes.
+
+## IDE Setup (IntelliJ IDEA)
+
+If you encounter the error `java: 找不到模块: atlantafx.base` (module not found: atlantafx.base) when building in IntelliJ IDEA:
+
+1. **Reimport Maven Project**: Right-click on `pom.xml` → Maven → Reimport
+2. **Invalidate Caches**: File → Invalidate Caches / Restart → Invalidate and Restart
+3. **Verify Module Path**: Ensure the project is recognized as a modular Java project
+4. **Build from Command Line**: Run `mvn clean compile` to verify the build works outside the IDE
