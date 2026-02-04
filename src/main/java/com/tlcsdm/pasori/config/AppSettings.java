@@ -26,7 +26,6 @@ public class AppSettings {
     private final ObjectProperty<AppTheme> themeProperty;
     
     private PreferencesFx preferencesFx;
-    private Runnable onSettingsChanged;
 
     private AppSettings() {
         // Initialize properties from saved preferences
@@ -38,9 +37,6 @@ public class AppSettings {
             if (newVal != null && !newVal.equals(oldVal)) {
                 I18N.setLocale(newVal);
                 rebuildPreferences();
-                if (onSettingsChanged != null) {
-                    onSettingsChanged.run();
-                }
             }
         });
 
@@ -60,13 +56,6 @@ public class AppSettings {
             instance = new AppSettings();
         }
         return instance;
-    }
-
-    /**
-     * Set callback for when settings change (for UI refresh).
-     */
-    public void setOnSettingsChanged(Runnable callback) {
-        this.onSettingsChanged = callback;
     }
 
     /**
