@@ -116,20 +116,6 @@ public class MainController implements Initializable {
         sendToAntennaRadio.setUserData("antenna");
 
         addLogEntry("[System] " + I18N.get("system.appStarted"));
-
-        // Register for settings changes
-        AppSettings.getInstance().setOnSettingsChanged(this::onLanguageChanged);
-    }
-
-    private void onLanguageChanged() {
-        // Show restart required message
-        Platform.runLater(() -> {
-            Alert alert = new Alert(Alert.AlertType.INFORMATION);
-            alert.setTitle(I18N.get("settings.title"));
-            alert.setHeaderText(null);
-            alert.setContentText(I18N.get("system.restartRequired"));
-            alert.showAndWait();
-        });
     }
 
     @FXML
