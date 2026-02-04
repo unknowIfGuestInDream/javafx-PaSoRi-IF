@@ -55,7 +55,7 @@
         <!-- アンテナIF Connection Panel -->
         <VBox spacing="10" HBox.hgrow="ALWAYS" style="-fx-border-color: #ccc; -fx-border-radius: 5; -fx-padding: 10;">
             <HBox alignment="CENTER_LEFT" spacing="10">
-                <Label text="アンテナIF Device (USB CDC-ACM)" style="-fx-font-weight: bold; -fx-font-size: 14px;"/>
+                <Label text="Panasonic アンテナIF (USB CDC-ACM)" style="-fx-font-weight: bold; -fx-font-size: 14px;"/>
                 <Circle fx:id="antennaStatusIndicator" radius="6" fill="GRAY"/>
                 <Label fx:id="antennaStatusLabel" text="Disconnected"/>
             </HBox>
@@ -105,6 +105,6 @@
 
     <!-- Footer / Status Bar -->
     <HBox alignment="CENTER" style="-fx-background-color: #f0f0f0; -fx-padding: 5;">
-        <Label text="Use this tool to bridge communication between PaSoRi SDK and USB CDC-ACM (アンテナIF仕様) devices"/>
+        <Label text="Use this tool to bridge communication between PaSoRi SDK and Panasonic USB CDC-ACM (アンテナIF仕様) devices"/>
     </HBox>
 </VBox>

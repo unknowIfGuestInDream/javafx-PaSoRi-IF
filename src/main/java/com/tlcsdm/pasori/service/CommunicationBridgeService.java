@@ -10,11 +10,11 @@ import com.tlcsdm.pasori.model.SerialPortConfig;
 import java.util.function.Consumer;
 
 /**
- * Bridge service that manages communication between PaSoRi device and アンテナIF device.
+ * Bridge service that manages communication between PaSoRi device and Panasonic アンテナIF device.
  * 
  * This service:
- * - Receives data from PaSoRi and forwards to アンテナIF
- * - Receives data from アンテナIF and forwards to PaSoRi
+ * - Receives data from PaSoRi and forwards to Panasonic アンテナIF
+ * - Receives data from Panasonic アンテナIF and forwards to PaSoRi
  * - Logs all communication for debugging purposes
  */
 public class CommunicationBridgeService {
@@ -79,7 +79,7 @@ public class CommunicationBridgeService {
     }
 
     /**
-     * Connect to アンテナIF device via USB CDC-ACM.
+     * Connect to Panasonic アンテナIF device via USB CDC-ACM.
      * 
      * @param config serial port configuration
      * @return true if connection successful

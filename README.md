@@ -1,6 +1,6 @@
 # PaSoRi IF Tool
 
-JavaFX tool for serial communication bridging between PaSoRi device and USB CDC-ACM (アンテナIF仕様) device.
+JavaFX tool for serial communication bridging between PaSoRi device and Panasonic USB CDC-ACM (アンテナIF仕様) device.
 
 ## Requirements
 
@@ -14,7 +14,7 @@ JavaFX tool for serial communication bridging between PaSoRi device and USB CDC-
 
 ## Features
 
-- **Dual Serial Port Connection**: Connect to both PaSoRi (SDK) and USB CDC-ACM (アンテナIF) devices simultaneously
+- **Dual Serial Port Connection**: Connect to both PaSoRi (SDK) and Panasonic USB CDC-ACM (アンテナIF) devices simultaneously
 - **Data Bridging**: Automatically forward data between two connected devices
 - **Communication Logging**: View all communication data in real-time with timestamps
 - **Manual Data Send**: Send hex data manually to either device for testing
