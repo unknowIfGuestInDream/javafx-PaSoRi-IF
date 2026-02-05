@@ -17,17 +17,22 @@ import java.util.function.Consumer;
 
 /**
  * Bridge service that manages communication between PaSoRi device and Panasonic アンテナIF device.
- * 
+ * <p>
  * This service:
- * - Receives data from PaSoRi and forwards to Panasonic アンテナIF
- * - Receives data from Panasonic アンテナIF and forwards to PaSoRi
- * - Uses message queues to ensure reliable message delivery even during sequential port connections
- * - Logs all communication for debugging purposes
+ * <ul>
+ *   <li>Receives data from PaSoRi and forwards to Panasonic アンテナIF</li>
+ *   <li>Receives data from Panasonic アンテナIF and forwards to PaSoRi</li>
+ *   <li>Uses message queues to ensure reliable message delivery even during sequential port connections</li>
+ *   <li>Logs all communication for debugging purposes</li>
+ * </ul>
+ * <p>
+ * The service uses {@link SerialPortHandler} abstraction for device communication,
+ * allowing for future device-specific implementations.
  */
 public class CommunicationBridgeService {
 
-    private final SerialPortService pasoriService;
-    private final SerialPortService antennaIfService;
+    private final SerialPortHandler pasoriHandler;
+    private final SerialPortHandler antennaIfHandler;
     
     // Message queues for reliable message delivery
     private final BlockingQueue<QueuedMessage> pasoriToAntennaQueue;
@@ -38,6 +43,12 @@ public class CommunicationBridgeService {
     
     // Maximum retry attempts for message delivery before discarding
     private static final int MAX_RETRY_ATTEMPTS = 100;
+    
+    // Retry delay in milliseconds
+    private static final long RETRY_DELAY_MS = 50;
+    
+    // Queue poll timeout in milliseconds
+    private static final long QUEUE_POLL_TIMEOUT_MS = 100;
     
     private Consumer<LogEntry> logCallback;
     private volatile boolean bridgingEnabled = false;
@@ -56,14 +67,41 @@ public class CommunicationBridgeService {
         }
     }
 
+    /**
+     * Create a new communication bridge service with default handlers.
+     */
     public CommunicationBridgeService() {
-        this.pasoriService = new SerialPortService();
-        this.antennaIfService = new SerialPortService();
+        this(new PaSoRiPortHandler(), new AntennaIfPortHandler());
+    }
+
+    /**
+     * Create a new communication bridge service with custom handlers.
+     * This constructor supports dependency injection for testing and customization.
+     *
+     * @param pasoriHandler    the handler for PaSoRi device
+     * @param antennaIfHandler the handler for AntennaIF device
+     */
+    public CommunicationBridgeService(SerialPortHandler pasoriHandler, SerialPortHandler antennaIfHandler) {
+        this.pasoriHandler = pasoriHandler;
+        this.antennaIfHandler = antennaIfHandler;
         this.pasoriToAntennaQueue = new LinkedBlockingQueue<>();
         this.antennaToPasoriQueue = new LinkedBlockingQueue<>();
         
         // Create named thread factory for better debugging
-        ThreadFactory threadFactory = new ThreadFactory() {
+        ThreadFactory threadFactory = createMessageProcessorThreadFactory();
+        this.messageProcessor = Executors.newFixedThreadPool(2, threadFactory);
+        
+        setupCallbacks();
+        startMessageProcessors();
+    }
+
+    /**
+     * Create a thread factory for message processor threads.
+     *
+     * @return the configured thread factory
+     */
+    private ThreadFactory createMessageProcessorThreadFactory() {
+        return new ThreadFactory() {
             private final AtomicInteger threadNumber = new AtomicInteger(1);
             @Override
             public Thread newThread(Runnable r) {
@@ -72,10 +110,6 @@ public class CommunicationBridgeService {
                 return t;
             }
         };
-        this.messageProcessor = Executors.newFixedThreadPool(2, threadFactory);
-        
-        setupCallbacks();
-        startMessageProcessors();
     }
     
     /**
@@ -83,58 +117,50 @@ public class CommunicationBridgeService {
      */
     private void startMessageProcessors() {
         // Processor for PaSoRi -> Antenna messages
-        messageProcessor.submit(() -> {
-            while (running) {
-                try {
-                    QueuedMessage message = pasoriToAntennaQueue.poll(100, TimeUnit.MILLISECONDS);
-                    if (message != null && antennaIfService.isConnected()) {
-                        try {
-                            int bytesWritten = antennaIfService.sendData(message.data);
-                            if (bytesWritten < 0) {
-                                // Send failed, re-queue with retry limit
-                                requeue(message, pasoriToAntennaQueue, "Antenna");
-                            }
-                        } catch (Exception e) {
-                            // Send failed, re-queue with retry limit
-                            requeue(message, pasoriToAntennaQueue, "Antenna");
-                        }
-                    } else if (message != null) {
-                        // Re-queue if antenna is not connected, with retry limit
-                        requeue(message, pasoriToAntennaQueue, "Antenna");
-                    }
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
-                    break;
-                }
-            }
-        });
+        messageProcessor.submit(() -> 
+            processMessageQueue(pasoriToAntennaQueue, antennaIfHandler, "Antenna"));
         
         // Processor for Antenna -> PaSoRi messages
-        messageProcessor.submit(() -> {
-            while (running) {
-                try {
-                    QueuedMessage message = antennaToPasoriQueue.poll(100, TimeUnit.MILLISECONDS);
-                    if (message != null && pasoriService.isConnected()) {
+        messageProcessor.submit(() -> 
+            processMessageQueue(antennaToPasoriQueue, pasoriHandler, "PaSoRi"));
+    }
+
+    /**
+     * Process messages from a queue and send them to the target handler.
+     * This method runs in a loop until the service is shut down.
+     *
+     * @param queue      the message queue to process
+     * @param target     the target handler to send messages to
+     * @param targetName the name of the target for logging
+     */
+    private void processMessageQueue(BlockingQueue<QueuedMessage> queue, 
+                                     SerialPortHandler target, 
+                                     String targetName) {
+        while (running) {
+            try {
+                QueuedMessage message = queue.poll(QUEUE_POLL_TIMEOUT_MS, TimeUnit.MILLISECONDS);
+                if (message != null) {
+                    if (target.isConnected()) {
                         try {
-                            int bytesWritten = pasoriService.sendData(message.data);
+                            int bytesWritten = target.sendData(message.data);
                             if (bytesWritten < 0) {
                                 // Send failed, re-queue with retry limit
-                                requeue(message, antennaToPasoriQueue, "PaSoRi");
+                                requeue(message, queue, targetName);
                             }
                         } catch (Exception e) {
                             // Send failed, re-queue with retry limit
-                            requeue(message, antennaToPasoriQueue, "PaSoRi");
+                            requeue(message, queue, targetName);
                         }
-                    } else if (message != null) {
-                        // Re-queue if PaSoRi is not connected, with retry limit
-                        requeue(message, antennaToPasoriQueue, "PaSoRi");
+                    } else {
+                        // Re-queue if target is not connected, with retry limit
+                        requeue(message, queue, targetName);
                     }
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
-                    break;
                 }
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                break;
             }
-        });
+        }
     }
     
     /**
@@ -150,7 +176,7 @@ public class CommunicationBridgeService {
             queue.offer(message);
             try {
                 // Brief sleep to prevent busy-waiting
-                Thread.sleep(50);
+                Thread.sleep(RETRY_DELAY_MS);
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
             }
@@ -162,7 +188,7 @@ public class CommunicationBridgeService {
 
     private void setupCallbacks() {
         // Forward data from PaSoRi to アンテナIF via queue
-        pasoriService.setDataReceivedCallback(data -> {
+        pasoriHandler.setDataReceivedCallback(data -> {
             log(LogEntry.Direction.PASORI_TO_ANTENNA, data);
             if (bridgingEnabled) {
                 pasoriToAntennaQueue.offer(new QueuedMessage(data));
@@ -170,7 +196,7 @@ public class CommunicationBridgeService {
         });
 
         // Forward data from アンテナIF to PaSoRi via queue
-        antennaIfService.setDataReceivedCallback(data -> {
+        antennaIfHandler.setDataReceivedCallback(data -> {
             log(LogEntry.Direction.ANTENNA_TO_PASORI, data);
             if (bridgingEnabled) {
                 antennaToPasoriQueue.offer(new QueuedMessage(data));
@@ -178,10 +204,10 @@ public class CommunicationBridgeService {
         });
 
         // Error callbacks
-        pasoriService.setErrorCallback(error -> 
-            log(LogEntry.Direction.SYSTEM, "PaSoRi Error: " + error));
-        antennaIfService.setErrorCallback(error -> 
-            log(LogEntry.Direction.SYSTEM, "アンテナIF Error: " + error));
+        pasoriHandler.setErrorCallback(error -> 
+            log(LogEntry.Direction.SYSTEM, pasoriHandler.getName() + " Error: " + error));
+        antennaIfHandler.setErrorCallback(error -> 
+            log(LogEntry.Direction.SYSTEM, antennaIfHandler.getName() + " Error: " + error));
     }
 
     /**
@@ -191,9 +217,9 @@ public class CommunicationBridgeService {
      * @return true if connection successful
      */
     public boolean connectPaSoRi(SerialPortConfig config) {
-        boolean result = pasoriService.connect(config);
+        boolean result = pasoriHandler.connect(config);
         if (result) {
-            log(LogEntry.Direction.SYSTEM, "PaSoRi connected on " + config.getPortName());
+            log(LogEntry.Direction.SYSTEM, pasoriHandler.getName() + " connected on " + config.getPortName());
         }
         return result;
     }
@@ -202,8 +228,8 @@ public class CommunicationBridgeService {
      * Disconnect from PaSoRi device.
      */
     public void disconnectPaSoRi() {
-        pasoriService.disconnect();
-        log(LogEntry.Direction.SYSTEM, "PaSoRi disconnected");
+        pasoriHandler.disconnect();
+        log(LogEntry.Direction.SYSTEM, pasoriHandler.getName() + " disconnected");
     }
 
     /**
@@ -213,9 +239,9 @@ public class CommunicationBridgeService {
      * @return true if connection successful
      */
     public boolean connectAntennaIf(SerialPortConfig config) {
-        boolean result = antennaIfService.connect(config);
+        boolean result = antennaIfHandler.connect(config);
         if (result) {
-            log(LogEntry.Direction.SYSTEM, "アンテナIF connected on " + config.getPortName());
+            log(LogEntry.Direction.SYSTEM, antennaIfHandler.getName() + " connected on " + config.getPortName());
         }
         return result;
     }
@@ -224,8 +250,8 @@ public class CommunicationBridgeService {
      * Disconnect from アンテナIF device.
      */
     public void disconnectAntennaIf() {
-        antennaIfService.disconnect();
-        log(LogEntry.Direction.SYSTEM, "アンテナIF disconnected");
+        antennaIfHandler.disconnect();
+        log(LogEntry.Direction.SYSTEM, antennaIfHandler.getName() + " disconnected");
     }
 
     /**
@@ -255,7 +281,7 @@ public class CommunicationBridgeService {
      */
     public int sendToPaSoRi(byte[] data) {
         log(LogEntry.Direction.ANTENNA_TO_PASORI, data);
-        return pasoriService.sendData(data);
+        return pasoriHandler.sendData(data);
     }
 
     /**
@@ -266,7 +292,7 @@ public class CommunicationBridgeService {
      */
     public int sendToAntennaIf(byte[] data) {
         log(LogEntry.Direction.PASORI_TO_ANTENNA, data);
-        return antennaIfService.sendData(data);
+        return antennaIfHandler.sendData(data);
     }
 
     /**
@@ -275,7 +301,7 @@ public class CommunicationBridgeService {
      * @return true if connected
      */
     public boolean isPaSoRiConnected() {
-        return pasoriService.isConnected();
+        return pasoriHandler.isConnected();
     }
 
     /**
@@ -284,7 +310,7 @@ public class CommunicationBridgeService {
      * @return true if connected
      */
     public boolean isAntennaIfConnected() {
-        return antennaIfService.isConnected();
+        return antennaIfHandler.isConnected();
     }
 
     /**
@@ -297,7 +323,7 @@ public class CommunicationBridgeService {
     }
 
     /**
-     * Shutdown all connections.
+     * Shutdown all connections and release resources.
      */
     public void shutdown() {
         bridgingEnabled = false;
@@ -318,8 +344,8 @@ public class CommunicationBridgeService {
         pasoriToAntennaQueue.clear();
         antennaToPasoriQueue.clear();
         
-        pasoriService.disconnect();
-        antennaIfService.disconnect();
+        pasoriHandler.disconnect();
+        antennaIfHandler.disconnect();
         log(LogEntry.Direction.SYSTEM, "Communication bridge shutdown");
     }
 
