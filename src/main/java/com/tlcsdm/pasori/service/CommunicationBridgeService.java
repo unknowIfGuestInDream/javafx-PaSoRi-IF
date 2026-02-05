@@ -165,7 +165,9 @@ public class CommunicationBridgeService {
         pasoriService.setDataReceivedCallback(data -> {
             log(LogEntry.Direction.PASORI_TO_ANTENNA, data);
             if (bridgingEnabled) {
-                pasoriToAntennaQueue.offer(new QueuedMessage(data));
+                // Convert PaSoRi data to Antenna protocol format before sending
+                byte[] convertedData = convertPaSoRiToAntennaProtocol(data);
+                pasoriToAntennaQueue.offer(new QueuedMessage(convertedData));
             }
         });
 
@@ -173,7 +175,9 @@ public class CommunicationBridgeService {
         antennaIfService.setDataReceivedCallback(data -> {
             log(LogEntry.Direction.ANTENNA_TO_PASORI, data);
             if (bridgingEnabled) {
-                antennaToPasoriQueue.offer(new QueuedMessage(data));
+                // Convert Antenna data to PaSoRi protocol format before sending
+                byte[] convertedData = convertAntennaToPaSoRiProtocol(data);
+                antennaToPasoriQueue.offer(new QueuedMessage(convertedData));
             }
         });
 
@@ -333,5 +337,47 @@ public class CommunicationBridgeService {
         if (logCallback != null) {
             logCallback.accept(new LogEntry(direction, message, false));
         }
+    }
+
+    /**
+     * Convert data received from PaSoRi to the protocol format expected by Antenna device.
+     * This method should transform the raw PaSoRi data to comply with the Antenna protocol.
+     * 
+     * @param data the raw data received from PaSoRi
+     * @return the converted data in Antenna protocol format
+     */
+    private byte[] convertPaSoRiToAntennaProtocol(byte[] data) {
+        if (data == null) {
+            return null;
+        }
+        // TODO: Implement PaSoRi to Antenna protocol conversion
+        // The raw data from PaSoRi needs to be transformed to match the Antenna protocol format.
+        // Example transformations may include:
+        // - Adding/removing protocol headers or trailers
+        // - Checksum calculation and appending
+        // - Data encoding/decoding
+        // - Command translation between protocols
+        return data;
+    }
+
+    /**
+     * Convert data received from Antenna device to the protocol format expected by PaSoRi.
+     * This method should transform the raw Antenna data to comply with the PaSoRi protocol.
+     * 
+     * @param data the raw data received from Antenna device
+     * @return the converted data in PaSoRi protocol format
+     */
+    private byte[] convertAntennaToPaSoRiProtocol(byte[] data) {
+        if (data == null) {
+            return null;
+        }
+        // TODO: Implement Antenna to PaSoRi protocol conversion
+        // The raw data from Antenna needs to be transformed to match the PaSoRi protocol format.
+        // Example transformations may include:
+        // - Adding/removing protocol headers or trailers
+        // - Checksum calculation and appending
+        // - Data encoding/decoding
+        // - Command translation between protocols
+        return data;
     }
 }
