@@ -63,6 +63,9 @@ public class MainController implements Initializable {
     @FXML private VBox logContainer;
     @FXML private Button clearLogBtn;
     @FXML private CheckBox autoScrollCheck;
+    @FXML private CheckBox filterPasoriToAntennaCheck;
+    @FXML private CheckBox filterAntennaToPasoriCheck;
+    @FXML private CheckBox filterSystemCheck;
 
     // Manual send controls
     @FXML private TextField sendDataField;
@@ -73,10 +76,10 @@ public class MainController implements Initializable {
 
     private final CommunicationBridgeService bridgeService;
     private final ObservableList<Integer> baudRates;
+    private final java.util.List<LogEntry> allLogEntries = new java.util.LinkedList<>();
 
     private Stage primaryStage;
     private ResourceBundle resources;
-    private int logLineCount = 0;
     private InlineCssTextArea styledLogArea;
     private VirtualizedScrollPane<InlineCssTextArea> logScrollPane;
 
@@ -111,6 +114,11 @@ public class MainController implements Initializable {
         // Setup styled log area for colored logs
         setupStyledLogArea();
         autoScrollCheck.setSelected(true);
+
+        // Setup log filter checkbox listeners
+        filterPasoriToAntennaCheck.selectedProperty().addListener((obs, oldVal, newVal) -> refreshLogDisplay());
+        filterAntennaToPasoriCheck.selectedProperty().addListener((obs, oldVal, newVal) -> refreshLogDisplay());
+        filterSystemCheck.selectedProperty().addListener((obs, oldVal, newVal) -> refreshLogDisplay());
 
         // Setup bridge service log callback
         bridgeService.setLogCallback(entry -> 
@@ -301,7 +309,7 @@ public class MainController implements Initializable {
     @FXML
     private void handleClearLog() {
         styledLogArea.clear();
-        logLineCount = 0;
+        allLogEntries.clear();
     }
 
     @FXML
@@ -402,16 +410,17 @@ public class MainController implements Initializable {
     }
 
     private void addLogEntry(LogEntry entry) {
-        logLineCount++;
+        // Store the entry in the list
+        allLogEntries.add(entry);
         
         // Limit log size - trim from the beginning if too many entries
-        if (logLineCount > MAX_LOG_ENTRIES) {
-            String text = styledLogArea.getText();
-            int firstNewline = text.indexOf('\n');
-            if (firstNewline >= 0) {
-                styledLogArea.deleteText(0, firstNewline + 1);
-            }
-            logLineCount--;
+        if (allLogEntries.size() > MAX_LOG_ENTRIES) {
+            allLogEntries.remove(0);
+        }
+        
+        // Check if this entry should be displayed based on current filter
+        if (!isEntryVisible(entry)) {
+            return;
         }
 
         // Get the color for this log entry
@@ -434,6 +443,51 @@ public class MainController implements Initializable {
         styledLogArea.setStyle(startPos, endPos, "-fx-fill: " + colorHex + ";");
 
         // Auto scroll to bottom
+        if (autoScrollCheck.isSelected()) {
+            styledLogArea.requestFollowCaret();
+            styledLogArea.moveTo(styledLogArea.getLength());
+        }
+    }
+
+    /**
+     * Check if a log entry should be visible based on current filter settings.
+     */
+    private boolean isEntryVisible(LogEntry entry) {
+        return switch (entry.getDirection()) {
+            case PASORI_TO_ANTENNA -> filterPasoriToAntennaCheck.isSelected();
+            case ANTENNA_TO_PASORI -> filterAntennaToPasoriCheck.isSelected();
+            case SYSTEM -> filterSystemCheck.isSelected();
+        };
+    }
+
+    /**
+     * Refresh the log display based on current filter settings.
+     */
+    private void refreshLogDisplay() {
+        styledLogArea.clear();
+        
+        boolean showTimestamp = AppSettings.getInstance().isLogTimestampEnabled();
+        
+        for (LogEntry entry : allLogEntries) {
+            if (!isEntryVisible(entry)) {
+                continue;
+            }
+            
+            String colorHex = AppSettings.getInstance().getLogColorHex(entry.getDirection());
+            String logText = entry.toString(showTimestamp);
+            
+            int startPos = styledLogArea.getLength();
+            if (startPos > 0) {
+                styledLogArea.appendText("\n");
+                startPos = styledLogArea.getLength();
+            }
+            
+            styledLogArea.appendText(logText);
+            int endPos = styledLogArea.getLength();
+            styledLogArea.setStyle(startPos, endPos, "-fx-fill: " + colorHex + ";");
+        }
+        
+        // Auto scroll to bottom after refresh
         if (autoScrollCheck.isSelected()) {
             styledLogArea.requestFollowCaret();
             styledLogArea.moveTo(styledLogArea.getLength());

@@ -97,6 +97,11 @@
             <HBox alignment="CENTER_LEFT" spacing="10">
                 <Label text="%log.title" style="-fx-font-weight: bold; -fx-font-size: 14px;"/>
                 <Region HBox.hgrow="ALWAYS"/>
+                <Label text="%log.filter"/>
+                <CheckBox fx:id="filterPasoriToAntennaCheck" text="%log.filter.pasoriToAntenna" selected="true"/>
+                <CheckBox fx:id="filterAntennaToPasoriCheck" text="%log.filter.antennaToPasori" selected="true"/>
+                <CheckBox fx:id="filterSystemCheck" text="%log.filter.system" selected="true"/>
+                <Separator orientation="VERTICAL"/>
                 <CheckBox fx:id="autoScrollCheck" text="%log.autoScroll" selected="true"/>
                 <Button fx:id="clearLogBtn" text="%button.clear" onAction="#handleClearLog"/>
             </HBox>
