@@ -35,7 +35,7 @@ mvn javafx:run
 Or run the JAR directly:
 
 ```bash
-java -jar target/javafx-pasori-if-1.0.0-SNAPSHOT.jar
+java -jar target/javafx-pasori-if.jar
 ```
 
 ## Usage
