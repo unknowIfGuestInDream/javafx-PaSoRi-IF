@@ -76,11 +76,10 @@ public class MainController implements Initializable {
 
     private final CommunicationBridgeService bridgeService;
     private final ObservableList<Integer> baudRates;
-    private final java.util.List<LogEntry> allLogEntries = new java.util.ArrayList<>();
+    private final java.util.List<LogEntry> allLogEntries = new java.util.LinkedList<>();
 
     private Stage primaryStage;
     private ResourceBundle resources;
-    private int logLineCount = 0;
     private InlineCssTextArea styledLogArea;
     private VirtualizedScrollPane<InlineCssTextArea> logScrollPane;
 
@@ -311,7 +310,6 @@ public class MainController implements Initializable {
     private void handleClearLog() {
         styledLogArea.clear();
         allLogEntries.clear();
-        logLineCount = 0;
     }
 
     @FXML
@@ -424,8 +422,6 @@ public class MainController implements Initializable {
         if (!isEntryVisible(entry)) {
             return;
         }
-        
-        logLineCount++;
 
         // Get the color for this log entry
         String colorHex = AppSettings.getInstance().getLogColorHex(entry.getDirection());
@@ -469,7 +465,6 @@ public class MainController implements Initializable {
      */
     private void refreshLogDisplay() {
         styledLogArea.clear();
-        logLineCount = 0;
         
         boolean showTimestamp = AppSettings.getInstance().isLogTimestampEnabled();
         
@@ -477,8 +472,6 @@ public class MainController implements Initializable {
             if (!isEntryVisible(entry)) {
                 continue;
             }
-            
-            logLineCount++;
             
             String colorHex = AppSettings.getInstance().getLogColorHex(entry.getDirection());
             String logText = entry.toString(showTimestamp);
