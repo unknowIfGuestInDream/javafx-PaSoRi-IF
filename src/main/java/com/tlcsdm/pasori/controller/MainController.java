@@ -22,12 +22,17 @@ import javafx.scene.image.Image;
 import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
 import javafx.scene.shape.Circle;
+import javafx.stage.FileChooser;
 import javafx.stage.Stage;
 import javafx.stage.Window;
 import org.fxmisc.flowless.VirtualizedScrollPane;
 import org.fxmisc.richtext.InlineCssTextArea;
 
+import java.io.File;
+import java.io.IOException;
 import java.io.InputStream;
+import java.io.PrintWriter;
+import java.nio.charset.StandardCharsets;
 
 import java.net.URL;
 import java.util.ResourceBundle;
@@ -86,6 +91,7 @@ public class MainController implements Initializable {
     private static final int MAX_LOG_ENTRIES = 1000;
     private static final String ICON_PATH = "/com/tlcsdm/pasori/images/logo.png";
     private static final String CONTROLSFX_CSS_FIX_PATH = "/com/tlcsdm/pasori/css/controlsfx-fix.css";
+    private static final String PREF_EXPORT_LOG_DIR = "exportLogDir";
 
     public MainController() {
         this.bridgeService = new CommunicationBridgeService();
@@ -234,6 +240,52 @@ public class MainController implements Initializable {
         setDialogIcon((Stage) alert.getDialogPane().getScene().getWindow());
         
         alert.showAndWait();
+    }
+
+    @FXML
+    private void handleExportLog() {
+        if (allLogEntries.isEmpty()) {
+            showAlert(I18N.get("error.title"), I18N.get("log.export.empty"));
+            return;
+        }
+
+        java.util.prefs.Preferences prefs = java.util.prefs.Preferences.userNodeForPackage(MainController.class);
+        String lastDir = prefs.get(PREF_EXPORT_LOG_DIR, System.getProperty("user.dir"));
+
+        FileChooser fileChooser = new FileChooser();
+        fileChooser.setTitle(I18N.get("menu.exportLog"));
+        fileChooser.getExtensionFilters().add(
+            new FileChooser.ExtensionFilter("Log files (*.log)", "*.log"));
+        fileChooser.setInitialFileName("pasori_log.log");
+
+        File initialDir = new File(lastDir);
+        if (initialDir.isDirectory()) {
+            fileChooser.setInitialDirectory(initialDir);
+        }
+
+        Window owner = (primaryStage != null) ? primaryStage : null;
+        File file = fileChooser.showSaveDialog(owner);
+        if (file == null) {
+            return;
+        }
+
+        // Remember the chosen directory
+        prefs.put(PREF_EXPORT_LOG_DIR, file.getParentFile().getAbsolutePath());
+
+        boolean showTimestamp = AppSettings.getInstance().isLogTimestampEnabled();
+        try (PrintWriter writer = new PrintWriter(file, StandardCharsets.UTF_8)) {
+            for (LogEntry entry : allLogEntries) {
+                writer.println(entry.toString(showTimestamp));
+            }
+            addLogEntry(new LogEntry(LogEntry.Direction.SYSTEM,
+                I18N.get("log.export.success", file.getAbsolutePath()), false));
+        } catch (IOException e) {
+            String errorMessage = e.getMessage();
+            if (errorMessage == null || errorMessage.isEmpty()) {
+                errorMessage = e.toString();
+            }
+            showAlert(I18N.get("error.title"), I18N.get("log.export.failed", errorMessage));
+        }
     }
 
     @FXML
