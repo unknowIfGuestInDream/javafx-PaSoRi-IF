@@ -263,8 +263,7 @@ public class MainController implements Initializable {
             fileChooser.setInitialDirectory(initialDir);
         }
 
-        Window owner = (primaryStage != null) ? primaryStage : null;
-        File file = fileChooser.showSaveDialog(owner);
+        File file = fileChooser.showSaveDialog(primaryStage);
         if (file == null) {
             return;
         }
