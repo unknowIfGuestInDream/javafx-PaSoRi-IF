@@ -18,6 +18,9 @@
             <MenuItem text="%menu.restart" onAction="#handleRestart"/>
             <MenuItem text="%menu.exit" onAction="#handleExit"/>
         </Menu>
+        <Menu text="%menu.tool">
+            <MenuItem text="%menu.exportLog" onAction="#handleExportLog"/>
+        </Menu>
         <Menu text="%menu.help">
             <MenuItem text="%menu.about" onAction="#handleAbout"/>
         </Menu>
