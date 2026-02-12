@@ -5,9 +5,10 @@
 .DESCRIPTION
     Uses Maven wrapper to build the project with Chinese mirror for faster downloads in CN.
     This script should be called from the project root directory.
+    Tests are skipped by default; use -RunTests to include them.
 #>
 param(
-    [switch]$SkipTests
+    [switch]$RunTests
 )
 
 $ErrorActionPreference = 'Stop'
@@ -41,9 +42,9 @@ $settingsDir = Split-Path $settingsFile -Parent
 if (-not (Test-Path $settingsDir)) { New-Item -ItemType Directory -Path $settingsDir | Out-Null }
 $settingsContent | Out-File -FilePath $settingsFile -Encoding utf8 -Force
 
-# Build command
+# Build command (skip tests by default)
 $mvnArgs = @('clean', 'package', '-s', $settingsFile)
-if ($SkipTests) {
+if (-not $RunTests) {
     $mvnArgs += '-DskipTests'
 }
 

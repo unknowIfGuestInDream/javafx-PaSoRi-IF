@@ -10,6 +10,11 @@ import com.sun.jna.Structure;
 import com.sun.jna.ptr.ByteByReference;
 import com.sun.jna.ptr.IntByReference;
 
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.util.Arrays;
 import java.util.List;
 
@@ -19,14 +24,47 @@ import java.util.List;
  *
  * <p>This interface provides Java bindings for the Sony FeliCa SDK,
  * enabling communication with PaSoRi NFC reader/writer devices.</p>
+ *
+ * <p>The native library is loaded in the following order:</p>
+ * <ol>
+ *   <li>From the classpath resource {@code /com/tlcsdm/pasori/sdk/felica/felica.dll}
+ *       (extracted to a temporary directory)</li>
+ *   <li>From the system library path ({@code felica.dll} on PATH or {@code jna.library.path})</li>
+ * </ol>
  */
 public interface FelicaLibrary extends Library {
 
+    /** Resource path for the bundled native library */
+    String RESOURCE_PATH = "/com/tlcsdm/pasori/sdk/felica/felica.dll";
+
     /**
      * Load the FeliCa library instance.
-     * The library name "felica" maps to felica.dll on Windows.
+     * Attempts to load from classpath resources first, then falls back to system path.
      */
-    FelicaLibrary INSTANCE = Native.load("felica", FelicaLibrary.class);
+    FelicaLibrary INSTANCE = loadLibrary();
+
+    /**
+     * Load the native library, trying the resources path first.
+     *
+     * @return the loaded FelicaLibrary instance
+     */
+    static FelicaLibrary loadLibrary() {
+        // Try loading from resources
+        try (InputStream is = FelicaLibrary.class.getResourceAsStream(RESOURCE_PATH)) {
+            if (is != null) {
+                Path tempDir = Files.createTempDirectory("felica-sdk");
+                Path tempDll = tempDir.resolve("felica.dll");
+                Files.copy(is, tempDll, StandardCopyOption.REPLACE_EXISTING);
+                tempDll.toFile().deleteOnExit();
+                tempDir.toFile().deleteOnExit();
+                return Native.load(tempDll.toAbsolutePath().toString(), FelicaLibrary.class);
+            }
+        } catch (IOException e) {
+            // Fall through to system path loading
+        }
+        // Fallback: load from system library path
+        return Native.load("felica", FelicaLibrary.class);
+    }
 
     // ---- Structures ----
 

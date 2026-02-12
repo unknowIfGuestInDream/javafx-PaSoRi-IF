@@ -23,31 +23,12 @@ jobs:
       - name: Build with Maven
         shell: pwsh
         run: |
-          & scripts\build.ps1 -SkipTests
+          & scripts\build.ps1
 
       - name: Resolve version & jar
         shell: pwsh
         run: |
-          $versionOutput = & mvn -q -DforceStdout 'help:evaluate' -Dexpression='project.version' 2>$null
-          $version = $versionOutput.Trim()
-          if (-not $version) { throw 'Failed to extract version from Maven' }
-          Add-Content -Path $env:GITHUB_ENV -Value "APP_VERSION=$version" -Encoding utf8
-
-          $jar = Get-ChildItem -Path 'target\javafx-pasori-if.jar' -File -ErrorAction SilentlyContinue | Select-Object -First 1
-          if ($null -eq $jar) { throw 'No jar file found matching pattern target\javafx-pasori-if.jar' }
-          Add-Content -Path $env:GITHUB_ENV -Value "APP_JAR=$($jar.Name)" -Encoding utf8
-
-          if (-not (Test-Path dist)) { New-Item -ItemType Directory -Path dist | Out-Null }
-          $jarFull = $jar.FullName
-
-          # Create staging directory
-          $stagingDir = 'staging'
-          if (-not (Test-Path $stagingDir)) { New-Item -ItemType Directory -Path $stagingDir | Out-Null }
-
-          # Copy files to staging
-          Copy-Item -Path $jarFull -Destination $stagingDir
-          Copy-Item -Path 'README.md' -Destination $stagingDir
-          Copy-Item -Path 'scripts\windows\*' -Destination $stagingDir -Recurse
+          & scripts\resolve-version.ps1
 
       - name: Download JRE
         shell: pwsh
@@ -59,14 +40,12 @@ jobs:
       - name: Package artifact
         shell: pwsh
         run: |
-          Compress-Archive -Path 'staging\*' -DestinationPath "dist/javafx-pasori-if-windows-$env:APP_VERSION.zip" -Force
-          Write-Host "Created dist/javafx-pasori-if-windows-$env:APP_VERSION.zip"
-          Remove-Item -Path 'staging' -Recurse -Force
+          & scripts\package-artifact.ps1
 
       - name: Upload packaged artifact
         uses: actions/upload-artifact@v4
         with:
-          name: javafx-pasori-if-windows
+          name: Pasori-if-windows
           path: dist/*
           retention-days: 7
 

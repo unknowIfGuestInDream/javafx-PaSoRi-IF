@@ -26,4 +26,4 @@ jobs:
       - name: Build with Maven
         shell: pwsh
         run: |
-          & scripts\build.ps1
+          & scripts\build.ps1 -RunTests
