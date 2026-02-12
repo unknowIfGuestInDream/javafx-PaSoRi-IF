@@ -3,13 +3,13 @@
  */
 package com.tlcsdm.pasori.controller;
 
-import com.fazecast.jSerialComm.SerialPort;
 import com.tlcsdm.pasori.PaSoRiApplication;
 import com.tlcsdm.pasori.config.AppSettings;
 import com.tlcsdm.pasori.config.I18N;
 import com.tlcsdm.pasori.model.LogEntry;
 import com.tlcsdm.pasori.model.SerialPortConfig;
 import com.tlcsdm.pasori.service.CommunicationBridgeService;
+import com.tlcsdm.pasori.service.DriverChecker;
 import com.tlcsdm.pasori.service.SerialPortService;
 import javafx.application.Platform;
 import javafx.collections.FXCollections;
@@ -43,9 +43,7 @@ import java.util.ResourceBundle;
  */
 public class MainController implements Initializable {
 
-    // PaSoRi connection controls
-    @FXML private ComboBox<String> pasoriPortCombo;
-    @FXML private ComboBox<Integer> pasoriBaudCombo;
+    // PaSoRi connection controls (SDK-based)
     @FXML private Button pasoriConnectBtn;
     @FXML private Button pasoriDisconnectBtn;
     @FXML private Circle pasoriStatusIndicator;
@@ -74,9 +72,6 @@ public class MainController implements Initializable {
 
     // Manual send controls
     @FXML private TextField sendDataField;
-    @FXML private ToggleGroup sendTargetGroup;
-    @FXML private RadioButton sendToPasoriRadio;
-    @FXML private RadioButton sendToAntennaRadio;
     @FXML private Button sendBtn;
 
     private final CommunicationBridgeService bridgeService;
@@ -111,9 +106,7 @@ public class MainController implements Initializable {
     public void initialize(URL location, ResourceBundle resources) {
         this.resources = resources;
 
-        // Setup baud rate options
-        pasoriBaudCombo.setItems(baudRates);
-        pasoriBaudCombo.setValue(115200);
+        // Setup baud rate options for Antenna IF only (PaSoRi uses SDK)
         antennaBaudCombo.setItems(baudRates);
         antennaBaudCombo.setValue(115200);
 
@@ -131,15 +124,16 @@ public class MainController implements Initializable {
             Platform.runLater(() -> addLogEntry(entry))
         );
 
-        // Initial port refresh
+        // Initial port refresh (for Antenna IF)
         refreshPorts();
 
         // Setup UI states
         updateConnectionButtons();
 
-        // Setup send target group
-        sendToPasoriRadio.setUserData("pasori");
-        sendToAntennaRadio.setUserData("antenna");
+        // Check driver installation at startup
+        if (!DriverChecker.isDriverInstalled()) {
+            addLogEntry(new LogEntry(LogEntry.Direction.SYSTEM, I18N.get("system.driverNotInstalled"), false));
+        }
 
         addLogEntry(new LogEntry(LogEntry.Direction.SYSTEM, I18N.get("system.appStarted"), false));
     }
@@ -294,23 +288,11 @@ public class MainController implements Initializable {
 
     @FXML
     private void handlePasoriConnect() {
-        String portName = pasoriPortCombo.getValue();
-        Integer baudRate = pasoriBaudCombo.getValue();
-
-        if (portName == null || portName.isEmpty()) {
-            showAlert(I18N.get("error.title"), I18N.get("error.selectPasoriPort"));
-            return;
-        }
-
-        SerialPortConfig config = new SerialPortConfig();
-        config.setPortName(portName);
-        config.setBaudRate(baudRate != null ? baudRate : 115200);
-
-        if (bridgeService.connectPaSoRi(config)) {
+        if (bridgeService.connectPaSoRi()) {
             updateConnectionButtons();
             updateStatusIndicator(pasoriStatusIndicator, pasoriStatusLabel, true, I18N.get("pasori.connected"));
         } else {
-            showAlert(I18N.get("error.connectionError"), I18N.get("error.pasoriConnectFailed", portName));
+            showAlert(I18N.get("error.connectionError"), I18N.get("error.pasoriSdkConnectFailed"));
         }
     }
 
@@ -379,28 +361,12 @@ public class MainController implements Initializable {
             return;
         }
 
-        Toggle selectedToggle = sendTargetGroup.getSelectedToggle();
-        if (selectedToggle == null) {
-            showAlert(I18N.get("error.title"), I18N.get("error.selectTargetDevice"));
+        if (!bridgeService.isAntennaIfConnected()) {
+            showAlert(I18N.get("error.title"), I18N.get("error.antennaNotConnected"));
             return;
         }
 
-        String target = (String) selectedToggle.getUserData();
-        int result;
-        if ("pasori".equals(target)) {
-            if (!bridgeService.isPaSoRiConnected()) {
-                showAlert(I18N.get("error.title"), I18N.get("error.pasoriNotConnected"));
-                return;
-            }
-            result = bridgeService.sendToPaSoRi(data);
-        } else {
-            if (!bridgeService.isAntennaIfConnected()) {
-                showAlert(I18N.get("error.title"), I18N.get("error.antennaNotConnected"));
-                return;
-            }
-            result = bridgeService.sendToAntennaIf(data);
-        }
-
+        int result = bridgeService.sendToAntennaIf(data);
         if (result > 0) {
             sendDataField.clear();
         }
@@ -409,29 +375,24 @@ public class MainController implements Initializable {
     private void refreshPorts() {
         String[] portNames = SerialPortService.getAvailablePortNames();
         
-        String selectedPasori = pasoriPortCombo.getValue();
         String selectedAntenna = antennaPortCombo.getValue();
 
         ObservableList<String> portList = FXCollections.observableArrayList(portNames);
         
-        pasoriPortCombo.setItems(portList);
-        antennaPortCombo.setItems(FXCollections.observableArrayList(portNames));
+        antennaPortCombo.setItems(portList);
 
-        // Restore selections if still available
-        if (selectedPasori != null && portList.contains(selectedPasori)) {
-            pasoriPortCombo.setValue(selectedPasori);
-        }
+        // Restore selection if still available
         if (selectedAntenna != null && portList.contains(selectedAntenna)) {
             antennaPortCombo.setValue(selectedAntenna);
         }
 
         // Add port descriptions to log
-        SerialPort[] ports = SerialPortService.getAvailablePorts();
+        com.fazecast.jSerialComm.SerialPort[] ports = SerialPortService.getAvailablePorts();
         if (ports.length == 0) {
             addLogEntry(new LogEntry(LogEntry.Direction.SYSTEM, I18N.get("system.noPortsFound"), false));
         } else {
             addLogEntry(new LogEntry(LogEntry.Direction.SYSTEM, I18N.get("system.portsFound", ports.length), false));
-            for (SerialPort port : ports) {
+            for (com.fazecast.jSerialComm.SerialPort port : ports) {
                 addLogEntry(new LogEntry(LogEntry.Direction.SYSTEM, 
                     "  - " + port.getSystemPortName() + " (" + port.getDescriptivePortName() + ")", false));
             }
@@ -442,8 +403,6 @@ public class MainController implements Initializable {
         boolean pasoriConnected = bridgeService.isPaSoRiConnected();
         pasoriConnectBtn.setDisable(pasoriConnected);
         pasoriDisconnectBtn.setDisable(!pasoriConnected);
-        pasoriPortCombo.setDisable(pasoriConnected);
-        pasoriBaudCombo.setDisable(pasoriConnected);
 
         boolean antennaConnected = bridgeService.isAntennaIfConnected();
         antennaConnectBtn.setDisable(antennaConnected);

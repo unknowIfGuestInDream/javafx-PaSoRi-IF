@@ -16,24 +16,24 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 
 /**
- * Bridge service that manages communication between PaSoRi device and Panasonic アンテナIF device.
+ * Bridge service that manages communication between PaSoRi device (via SDK) and Panasonic アンテナIF device.
  * 
  * This service:
- * - Receives data from PaSoRi and forwards to Panasonic アンテナIF
- * - Receives data from Panasonic アンテナIF and forwards to PaSoRi
- * - Uses message queues to ensure reliable message delivery even during sequential port connections
+ * - Uses the FeliCa SDK to communicate with PaSoRi (polling for cards, reading IDm/PMm)
+ * - Receives data from Panasonic アンテナIF via serial port
+ * - Forwards card data from PaSoRi to アンテナIF
+ * - Uses message queues to ensure reliable message delivery
  * - Logs all communication for debugging purposes
  */
 public class CommunicationBridgeService {
 
-    private final SerialPortService pasoriService;
+    private final PaSoRiSdkService pasoriSdkService;
     private final SerialPortService antennaIfService;
     
-    // Message queues for reliable message delivery
+    // Message queue for PaSoRi -> Antenna messages
     private final BlockingQueue<QueuedMessage> pasoriToAntennaQueue;
-    private final BlockingQueue<QueuedMessage> antennaToPasoriQueue;
     
-    // Background executor for processing queued messages
+    // Background executor for processing queued messages and polling
     private final ExecutorService messageProcessor;
     
     // Maximum retry attempts for message delivery before discarding
@@ -41,6 +41,7 @@ public class CommunicationBridgeService {
     
     private Consumer<LogEntry> logCallback;
     private volatile boolean bridgingEnabled = false;
+    private volatile boolean pollingActive = false;
     private volatile boolean running = true;
     
     /**
@@ -57,10 +58,9 @@ public class CommunicationBridgeService {
     }
 
     public CommunicationBridgeService() {
-        this.pasoriService = new SerialPortService();
+        this.pasoriSdkService = new PaSoRiSdkService();
         this.antennaIfService = new SerialPortService();
         this.pasoriToAntennaQueue = new LinkedBlockingQueue<>();
-        this.antennaToPasoriQueue = new LinkedBlockingQueue<>();
         
         // Create named thread factory for better debugging
         ThreadFactory threadFactory = new ThreadFactory() {
@@ -82,7 +82,7 @@ public class CommunicationBridgeService {
      * Start background threads to process queued messages.
      */
     private void startMessageProcessors() {
-        // Processor for PaSoRi -> Antenna messages
+        // Processor for PaSoRi -> Antenna messages (from SDK polling results)
         messageProcessor.submit(() -> {
             while (running) {
                 try {
@@ -91,15 +91,12 @@ public class CommunicationBridgeService {
                         try {
                             int bytesWritten = antennaIfService.sendData(message.data);
                             if (bytesWritten < 0) {
-                                // Send failed, re-queue with retry limit
                                 requeue(message, pasoriToAntennaQueue, "Antenna");
                             }
                         } catch (Exception e) {
-                            // Send failed, re-queue with retry limit
                             requeue(message, pasoriToAntennaQueue, "Antenna");
                         }
                     } else if (message != null) {
-                        // Re-queue if antenna is not connected, with retry limit
                         requeue(message, pasoriToAntennaQueue, "Antenna");
                     }
                 } catch (InterruptedException e) {
@@ -109,26 +106,27 @@ public class CommunicationBridgeService {
             }
         });
         
-        // Processor for Antenna -> PaSoRi messages
+        // Polling thread for PaSoRi SDK card detection
         messageProcessor.submit(() -> {
             while (running) {
                 try {
-                    QueuedMessage message = antennaToPasoriQueue.poll(100, TimeUnit.MILLISECONDS);
-                    if (message != null && pasoriService.isConnected()) {
-                        try {
-                            int bytesWritten = pasoriService.sendData(message.data);
-                            if (bytesWritten < 0) {
-                                // Send failed, re-queue with retry limit
-                                requeue(message, antennaToPasoriQueue, "PaSoRi");
+                    if (pollingActive && pasoriSdkService.isReaderOpened()) {
+                        byte[][] cardData = pasoriSdkService.pollCard();
+                        if (cardData != null) {
+                            byte[] idm = cardData[0];
+                            byte[] pmm = cardData[1];
+                            log(LogEntry.Direction.PASORI_TO_ANTENNA,
+                                "Card detected - IDm: " + PaSoRiSdkService.bytesToHex(idm)
+                                + " PMm: " + PaSoRiSdkService.bytesToHex(pmm));
+                            
+                            if (bridgingEnabled) {
+                                // Forward card IDm data to Antenna IF
+                                byte[] convertedData = convertPaSoRiToAntennaProtocol(idm);
+                                pasoriToAntennaQueue.offer(new QueuedMessage(convertedData));
                             }
-                        } catch (Exception e) {
-                            // Send failed, re-queue with retry limit
-                            requeue(message, antennaToPasoriQueue, "PaSoRi");
                         }
-                    } else if (message != null) {
-                        // Re-queue if PaSoRi is not connected, with retry limit
-                        requeue(message, antennaToPasoriQueue, "PaSoRi");
                     }
+                    Thread.sleep(500); // Poll interval
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
                     break;
@@ -139,17 +137,12 @@ public class CommunicationBridgeService {
     
     /**
      * Re-queue a message with retry limit checking.
-     * 
-     * @param message the message to re-queue
-     * @param queue the queue to add the message to
-     * @param targetName the name of the target device for logging
      */
     private void requeue(QueuedMessage message, BlockingQueue<QueuedMessage> queue, String targetName) {
         message.retryCount++;
         if (message.retryCount < MAX_RETRY_ATTEMPTS) {
             queue.offer(message);
             try {
-                // Brief sleep to prevent busy-waiting
                 Thread.sleep(50);
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
@@ -161,43 +154,37 @@ public class CommunicationBridgeService {
     }
 
     private void setupCallbacks() {
-        // Forward data from PaSoRi to アンテナIF via queue
-        pasoriService.setDataReceivedCallback(data -> {
-            log(LogEntry.Direction.PASORI_TO_ANTENNA, data);
-            if (bridgingEnabled) {
-                // Convert PaSoRi data to Antenna protocol format before sending
-                byte[] convertedData = convertPaSoRiToAntennaProtocol(data);
-                pasoriToAntennaQueue.offer(new QueuedMessage(convertedData));
-            }
-        });
+        // Setup SDK callbacks
+        pasoriSdkService.setErrorCallback(error ->
+            log(LogEntry.Direction.SYSTEM, "PaSoRi SDK Error: " + error));
+        pasoriSdkService.setInfoCallback(info ->
+            log(LogEntry.Direction.SYSTEM, "PaSoRi SDK: " + info));
 
-        // Forward data from アンテナIF to PaSoRi via queue
+        // Forward data received from アンテナIF to log
         antennaIfService.setDataReceivedCallback(data -> {
             log(LogEntry.Direction.ANTENNA_TO_PASORI, data);
-            if (bridgingEnabled) {
-                // Convert Antenna data to PaSoRi protocol format before sending
-                byte[] convertedData = convertAntennaToPaSoRiProtocol(data);
-                antennaToPasoriQueue.offer(new QueuedMessage(convertedData));
-            }
         });
 
         // Error callbacks
-        pasoriService.setErrorCallback(error -> 
-            log(LogEntry.Direction.SYSTEM, "PaSoRi Error: " + error));
         antennaIfService.setErrorCallback(error -> 
             log(LogEntry.Direction.SYSTEM, "アンテナIF Error: " + error));
     }
 
     /**
-     * Connect to PaSoRi device.
+     * Connect to PaSoRi device via FeliCa SDK (auto-detect).
      * 
-     * @param config serial port configuration
      * @return true if connection successful
      */
-    public boolean connectPaSoRi(SerialPortConfig config) {
-        boolean result = pasoriService.connect(config);
+    public boolean connectPaSoRi() {
+        if (!pasoriSdkService.isInitialized()) {
+            if (!pasoriSdkService.initializeLibrary()) {
+                return false;
+            }
+        }
+        boolean result = pasoriSdkService.openReaderAuto();
         if (result) {
-            log(LogEntry.Direction.SYSTEM, "PaSoRi connected on " + config.getPortName());
+            pollingActive = true;
+            log(LogEntry.Direction.SYSTEM, "PaSoRi connected via SDK (auto-detect)");
         }
         return result;
     }
@@ -206,7 +193,8 @@ public class CommunicationBridgeService {
      * Disconnect from PaSoRi device.
      */
     public void disconnectPaSoRi() {
-        pasoriService.disconnect();
+        pollingActive = false;
+        pasoriSdkService.closeReader();
         log(LogEntry.Direction.SYSTEM, "PaSoRi disconnected");
     }
 
@@ -252,17 +240,6 @@ public class CommunicationBridgeService {
     }
 
     /**
-     * Manually send data to PaSoRi device.
-     * 
-     * @param data the data to send
-     * @return bytes written or -1 on error
-     */
-    public int sendToPaSoRi(byte[] data) {
-        log(LogEntry.Direction.ANTENNA_TO_PASORI, data);
-        return pasoriService.sendData(data);
-    }
-
-    /**
      * Manually send data to アンテナIF device.
      * 
      * @param data the data to send
@@ -274,12 +251,12 @@ public class CommunicationBridgeService {
     }
 
     /**
-     * Check if PaSoRi is connected.
+     * Check if PaSoRi is connected via SDK.
      * 
      * @return true if connected
      */
     public boolean isPaSoRiConnected() {
-        return pasoriService.isConnected();
+        return pasoriSdkService.isReaderOpened();
     }
 
     /**
@@ -305,6 +282,7 @@ public class CommunicationBridgeService {
      */
     public void shutdown() {
         bridgingEnabled = false;
+        pollingActive = false;
         running = false;
         
         // Shutdown message processor threads
@@ -320,9 +298,8 @@ public class CommunicationBridgeService {
         
         // Clear any remaining queued messages
         pasoriToAntennaQueue.clear();
-        antennaToPasoriQueue.clear();
         
-        pasoriService.disconnect();
+        pasoriSdkService.shutdown();
         antennaIfService.disconnect();
         log(LogEntry.Direction.SYSTEM, "Communication bridge shutdown");
     }
@@ -341,9 +318,8 @@ public class CommunicationBridgeService {
 
     /**
      * Convert data received from PaSoRi to the protocol format expected by Antenna device.
-     * This method should transform the raw PaSoRi data to comply with the Antenna protocol.
      * 
-     * @param data the raw data received from PaSoRi
+     * @param data the raw data received from PaSoRi (e.g. card IDm)
      * @return the converted data in Antenna protocol format
      */
     private byte[] convertPaSoRiToAntennaProtocol(byte[] data) {
@@ -351,33 +327,6 @@ public class CommunicationBridgeService {
             return null;
         }
         // TODO: Implement PaSoRi to Antenna protocol conversion
-        // The raw data from PaSoRi needs to be transformed to match the Antenna protocol format.
-        // Example transformations may include:
-        // - Adding/removing protocol headers or trailers
-        // - Checksum calculation and appending
-        // - Data encoding/decoding
-        // - Command translation between protocols
-        return data;
-    }
-
-    /**
-     * Convert data received from Antenna device to the protocol format expected by PaSoRi.
-     * This method should transform the raw Antenna data to comply with the PaSoRi protocol.
-     * 
-     * @param data the raw data received from Antenna device
-     * @return the converted data in PaSoRi protocol format
-     */
-    private byte[] convertAntennaToPaSoRiProtocol(byte[] data) {
-        if (data == null) {
-            return null;
-        }
-        // TODO: Implement Antenna to PaSoRi protocol conversion
-        // The raw data from Antenna needs to be transformed to match the PaSoRi protocol format.
-        // Example transformations may include:
-        // - Adding/removing protocol headers or trailers
-        // - Checksum calculation and appending
-        // - Data encoding/decoding
-        // - Command translation between protocols
         return data;
     }
 }
