@@ -22,7 +22,15 @@ To include tests, use:
 .\scripts\build.ps1 -RunTests
 ```
 
-### 2. Download JRE
+### 2. Resolve version & prepare staging
+
+```powershell
+.\scripts\resolve-version.ps1
+```
+
+Extracts the Maven project version, locates the built jar, and copies all necessary files into the `staging/` directory.
+
+### 3. Download JRE
 
 ```powershell
 Push-Location staging
@@ -30,16 +38,7 @@ Push-Location staging
 Pop-Location
 ```
 
-Downloads the Adoptium JRE 21 for Windows x64.
-Run this after `resolve-version.ps1` has created the staging directory.
-
-### 3. Resolve version & prepare staging
-
-```powershell
-.\scripts\resolve-version.ps1
-```
-
-Extracts the Maven project version, locates the built jar, and copies all necessary files into the `staging/` directory.
+Downloads the Adoptium JRE 21 for Windows x64 into the staging directory.
 
 ### 4. Package artifact
 

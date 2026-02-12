@@ -55,8 +55,10 @@ public interface FelicaLibrary extends Library {
                 Path tempDir = Files.createTempDirectory("felica-sdk");
                 Path tempDll = tempDir.resolve("felica.dll");
                 Files.copy(is, tempDll, StandardCopyOption.REPLACE_EXISTING);
-                tempDll.toFile().deleteOnExit();
+                // deleteOnExit processes in reverse registration order:
+                // register dir first, then file → file deleted first, then empty dir
                 tempDir.toFile().deleteOnExit();
+                tempDll.toFile().deleteOnExit();
                 return Native.load(tempDll.toAbsolutePath().toString(), FelicaLibrary.class);
             }
         } catch (IOException e) {
