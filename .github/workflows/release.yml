@@ -21,7 +21,9 @@ jobs:
           cache: maven
 
       - name: Build with Maven
-        run: mvn clean package -DskipTests
+        shell: pwsh
+        run: |
+          & scripts\build.ps1 -SkipTests
 
       - name: Resolve version & jar
         shell: pwsh

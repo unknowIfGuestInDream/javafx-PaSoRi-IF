@@ -24,4 +24,6 @@ jobs:
           cache: maven
 
       - name: Build with Maven
-        run: mvn clean package
+        shell: pwsh
+        run: |
+          & scripts\build.ps1

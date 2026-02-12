@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2026, 梦里不知身是客
  */
-package com.tlcsdm.pasori.sdk;
+package com.tlcsdm.pasori.sdk.felica;
 
 /**
  * FeliCa Access Library error types.

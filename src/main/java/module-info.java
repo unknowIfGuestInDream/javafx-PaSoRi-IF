@@ -22,5 +22,5 @@ module com.tlcsdm.pasori {
     exports com.tlcsdm.pasori.model;
     exports com.tlcsdm.pasori.service;
     exports com.tlcsdm.pasori.config;
-    exports com.tlcsdm.pasori.sdk;
+    exports com.tlcsdm.pasori.sdk.felica;
 }

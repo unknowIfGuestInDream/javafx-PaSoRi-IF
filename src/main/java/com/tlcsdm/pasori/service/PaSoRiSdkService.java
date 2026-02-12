@@ -6,11 +6,11 @@ package com.tlcsdm.pasori.service;
 import com.sun.jna.Memory;
 import com.sun.jna.ptr.ByteByReference;
 import com.sun.jna.ptr.IntByReference;
-import com.tlcsdm.pasori.sdk.FelicaErrorType;
-import com.tlcsdm.pasori.sdk.FelicaLibrary;
-import com.tlcsdm.pasori.sdk.FelicaLibrary.CardInformation;
-import com.tlcsdm.pasori.sdk.FelicaLibrary.Polling;
-import com.tlcsdm.pasori.sdk.RwErrorType;
+import com.tlcsdm.pasori.sdk.felica.FelicaErrorType;
+import com.tlcsdm.pasori.sdk.felica.FelicaLibrary;
+import com.tlcsdm.pasori.sdk.felica.FelicaLibrary.CardInformation;
+import com.tlcsdm.pasori.sdk.felica.FelicaLibrary.Polling;
+import com.tlcsdm.pasori.sdk.felica.RwErrorType;
 
 import java.util.function.Consumer;
 
