@@ -10,11 +10,6 @@ import com.sun.jna.Structure;
 import com.sun.jna.ptr.ByteByReference;
 import com.sun.jna.ptr.IntByReference;
 
-import java.io.IOException;
-import java.io.InputStream;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.StandardCopyOption;
 import java.util.Arrays;
 import java.util.List;
 
@@ -25,48 +20,22 @@ import java.util.List;
  * <p>This interface provides Java bindings for the Sony FeliCa SDK,
  * enabling communication with PaSoRi NFC reader/writer devices.</p>
  *
- * <p>The native library is loaded in the following order:</p>
- * <ol>
- *   <li>From the classpath resource {@code /com/tlcsdm/pasori/sdk/felica/felica.dll}
- *       (extracted to a temporary directory)</li>
- *   <li>From the system library path ({@code felica.dll} on PATH or {@code jna.library.path})</li>
- * </ol>
+ * <p>The native library {@code felica.dll} is loaded from the system library path.
+ * It is installed by the FeliCa port driver ({@code NFCPortWithDriver.exe}).
+ * Ensure the driver is installed before using this interface.</p>
+ *
+ * <p>The SDK also provides {@code felica.lib} (a C/C++ import library) and header files,
+ * which are stored in {@code resources/com/tlcsdm/pasori/sdk/felica/} for reference.
+ * JNA loads the runtime {@code .dll}, not the compile-time {@code .lib}.</p>
  */
 public interface FelicaLibrary extends Library {
 
-    /** Resource path for the bundled native library */
-    String RESOURCE_PATH = "/com/tlcsdm/pasori/sdk/felica/felica.dll";
-
     /**
-     * Load the FeliCa library instance.
-     * Attempts to load from classpath resources first, then falls back to system path.
+     * Load the FeliCa library instance from the system library path.
+     * The library name "felica" maps to felica.dll on Windows.
+     * The DLL is installed by the FeliCa port driver (NFCPortWithDriver.exe).
      */
-    FelicaLibrary INSTANCE = loadLibrary();
-
-    /**
-     * Load the native library, trying the resources path first.
-     *
-     * @return the loaded FelicaLibrary instance
-     */
-    static FelicaLibrary loadLibrary() {
-        // Try loading from resources
-        try (InputStream is = FelicaLibrary.class.getResourceAsStream(RESOURCE_PATH)) {
-            if (is != null) {
-                Path tempDir = Files.createTempDirectory("felica-sdk");
-                Path tempDll = tempDir.resolve("felica.dll");
-                Files.copy(is, tempDll, StandardCopyOption.REPLACE_EXISTING);
-                // deleteOnExit processes in reverse registration order:
-                // register dir first, then file → file deleted first, then empty dir
-                tempDir.toFile().deleteOnExit();
-                tempDll.toFile().deleteOnExit();
-                return Native.load(tempDll.toAbsolutePath().toString(), FelicaLibrary.class);
-            }
-        } catch (IOException e) {
-            // Fall through to system path loading
-        }
-        // Fallback: load from system library path
-        return Native.load("felica", FelicaLibrary.class);
-    }
+    FelicaLibrary INSTANCE = Native.load("felica", FelicaLibrary.class);
 
     // ---- Structures ----
 

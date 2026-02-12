@@ -42,8 +42,7 @@ hs_err_pid*
 *.dll
 *.so
 
-# Allow native libraries in SDK resources
-!src/main/resources/**/sdk/**/*.dll
+# Allow import library in SDK resources
 !src/main/resources/**/sdk/**/*.lib
 
 # Build artifacts
