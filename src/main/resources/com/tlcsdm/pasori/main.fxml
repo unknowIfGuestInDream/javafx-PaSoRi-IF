@@ -38,22 +38,12 @@
 
         <!-- Connection Panels -->
         <HBox spacing="20" VBox.vgrow="NEVER">
-            <!-- PaSoRi Connection Panel -->
+            <!-- PaSoRi Connection Panel (SDK-based) -->
             <VBox spacing="10" HBox.hgrow="ALWAYS" style="-fx-border-color: #ccc; -fx-border-radius: 5; -fx-padding: 10;">
                 <HBox alignment="CENTER_LEFT" spacing="10">
                     <Label text="%pasori.device" style="-fx-font-weight: bold; -fx-font-size: 14px;"/>
                     <Circle fx:id="pasoriStatusIndicator" radius="6" fill="GRAY"/>
                     <Label fx:id="pasoriStatusLabel" text="%pasori.disconnected"/>
-                </HBox>
-                
-                <HBox spacing="10" alignment="CENTER_LEFT">
-                    <Label text="%label.port" prefWidth="50"/>
-                    <ComboBox fx:id="pasoriPortCombo" prefWidth="150" promptText="Select port"/>
-                </HBox>
-                
-                <HBox spacing="10" alignment="CENTER_LEFT">
-                    <Label text="%label.baud" prefWidth="50"/>
-                    <ComboBox fx:id="pasoriBaudCombo" prefWidth="150"/>
                 </HBox>
                 
                 <HBox spacing="10">
@@ -112,16 +102,11 @@
             <TextArea fx:id="logTextArea" VBox.vgrow="ALWAYS" editable="false" wrapText="true" style="-fx-font-family: monospace;"/>
         </VBox>
 
-        <!-- Manual Send Panel -->
+        <!-- Manual Send Panel (to Antenna IF) -->
         <VBox spacing="5" style="-fx-border-color: #ccc; -fx-border-radius: 5; -fx-padding: 10;">
             <Label text="%send.title" style="-fx-font-weight: bold; -fx-font-size: 14px;"/>
             <HBox spacing="10" alignment="CENTER_LEFT">
                 <TextField fx:id="sendDataField" HBox.hgrow="ALWAYS" promptText="%send.placeholder"/>
-                <fx:define>
-                    <ToggleGroup fx:id="sendTargetGroup"/>
-                </fx:define>
-                <RadioButton fx:id="sendToPasoriRadio" text="%send.toPasori" toggleGroup="$sendTargetGroup" selected="true"/>
-                <RadioButton fx:id="sendToAntennaRadio" text="%send.toAntenna" toggleGroup="$sendTargetGroup"/>
                 <Button fx:id="sendBtn" text="%button.send" onAction="#handleSendData" prefWidth="80"/>
             </HBox>
         </VBox>

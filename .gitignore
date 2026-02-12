@@ -9,6 +9,7 @@ dependency-reduced-pom.xml
 buildNumber.properties
 .mvn/timing.properties
 .mvn/wrapper/maven-wrapper.jar
+.mvn/settings.xml
 
 # IDE
 .idea/
@@ -40,6 +41,9 @@ hs_err_pid*
 *.dylib
 *.dll
 *.so
+
+# Allow import library in SDK resources
+!src/main/resources/**/sdk/**/*.lib
 
 # Build artifacts
 staging/

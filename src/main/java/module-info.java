@@ -2,6 +2,8 @@ module com.tlcsdm.pasori {
     requires javafx.controls;
     requires javafx.fxml;
     requires com.fazecast.jSerialComm;
+    requires com.sun.jna;
+    requires com.sun.jna.platform;
     requires com.dlsc.preferencesfx;
     requires atlantafx.base;
     requires java.prefs;
@@ -20,4 +22,5 @@ module com.tlcsdm.pasori {
     exports com.tlcsdm.pasori.model;
     exports com.tlcsdm.pasori.service;
     exports com.tlcsdm.pasori.config;
+    exports com.tlcsdm.pasori.sdk.felica;
 }
