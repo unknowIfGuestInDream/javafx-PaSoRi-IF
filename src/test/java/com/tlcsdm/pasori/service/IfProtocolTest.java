@@ -331,6 +331,146 @@ class IfProtocolTest {
         assertArrayEquals(felicaData, msg.getData());
     }
 
+    // ---- FeliCa Command Routing Tests ----
+
+    @Test
+    void testGetFelicaCommandCodePolling() {
+        // Polling: [LEN=0x06, CMD=0x04, SystemCode(2), RequestCode, TimeSlot]
+        byte[] pollingData = {0x06, 0x04, (byte) 0xFF, (byte) 0xFF, 0x00, 0x00};
+        assertEquals(0x04, IfProtocol.getFelicaCommandCode(pollingData));
+    }
+
+    @Test
+    void testGetFelicaCommandCodeReadWithoutEncryption() {
+        // Read Without Encryption: [LEN, CMD=0x06, IDm(8), ...]
+        byte[] readData = {0x10, 0x06, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08,
+            0x01, 0x09, 0x00, (byte) 0x80, 0x00, (byte) 0x8B};
+        assertEquals(0x06, IfProtocol.getFelicaCommandCode(readData));
+    }
+
+    @Test
+    void testGetFelicaCommandCodeWriteWithoutEncryption() {
+        // Write Without Encryption: CMD=0x08
+        byte[] writeData = {0x20, 0x08, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08};
+        assertEquals(0x08, IfProtocol.getFelicaCommandCode(writeData));
+    }
+
+    @Test
+    void testGetFelicaCommandCodeNullData() {
+        assertEquals(-1, IfProtocol.getFelicaCommandCode(null));
+    }
+
+    @Test
+    void testGetFelicaCommandCodeTooShort() {
+        assertEquals(-1, IfProtocol.getFelicaCommandCode(new byte[]{0x01}));
+    }
+
+    @Test
+    void testIsFelicaPollingCommandTrue() {
+        byte[] pollingData = {0x06, 0x04, (byte) 0xFF, (byte) 0xFF, 0x00, 0x00};
+        assertTrue(IfProtocol.isFelicaPollingCommand(pollingData));
+    }
+
+    @Test
+    void testIsFelicaPollingCommandFalseReadCmd() {
+        byte[] readData = {0x10, 0x06, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08};
+        assertFalse(IfProtocol.isFelicaPollingCommand(readData));
+    }
+
+    @Test
+    void testIsFelicaPollingCommandFalseNull() {
+        assertFalse(IfProtocol.isFelicaPollingCommand(null));
+    }
+
+    @Test
+    void testExtractPollingSystemCode() {
+        byte[] pollingData = {0x06, 0x04, (byte) 0x88, (byte) 0xB4, 0x00, 0x00};
+        byte[] systemCode = IfProtocol.extractPollingSystemCode(pollingData);
+        assertNotNull(systemCode);
+        assertEquals(2, systemCode.length);
+        assertEquals((byte) 0x88, systemCode[0]);
+        assertEquals((byte) 0xB4, systemCode[1]);
+    }
+
+    @Test
+    void testExtractPollingSystemCodeWildcard() {
+        byte[] pollingData = {0x06, 0x04, (byte) 0xFF, (byte) 0xFF, 0x00, 0x00};
+        byte[] systemCode = IfProtocol.extractPollingSystemCode(pollingData);
+        assertNotNull(systemCode);
+        assertEquals((byte) 0xFF, systemCode[0]);
+        assertEquals((byte) 0xFF, systemCode[1]);
+    }
+
+    @Test
+    void testExtractPollingSystemCodeTooShort() {
+        assertNull(IfProtocol.extractPollingSystemCode(new byte[]{0x02, 0x04}));
+    }
+
+    @Test
+    void testExtractPollingTimeSlot() {
+        byte[] pollingData = {0x06, 0x04, (byte) 0xFF, (byte) 0xFF, 0x00, 0x0F};
+        assertEquals(0x0F, IfProtocol.extractPollingTimeSlot(pollingData));
+    }
+
+    @Test
+    void testExtractPollingTimeSlotDefault() {
+        // Too short data defaults to 0x00 (single slot)
+        byte[] pollingData = {0x04, 0x04, (byte) 0xFF, (byte) 0xFF};
+        assertEquals(0x00, IfProtocol.extractPollingTimeSlot(pollingData));
+    }
+
+    @Test
+    void testBuildFelicaPollingResponse() {
+        byte[] idm = {0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08};
+        byte[] pmm = {0x10, 0x20, 0x30, 0x40, 0x50, 0x60, 0x70, (byte) 0x80};
+        byte[] response = IfProtocol.buildFelicaPollingResponse(idm, pmm);
+        assertNotNull(response);
+        assertEquals(18, response.length);
+        assertEquals(18, response[0]); // LEN
+        assertEquals(IfProtocol.FELICA_RES_POLLING, response[1]); // 0x05
+        // Verify IDm
+        for (int i = 0; i < 8; i++) {
+            assertEquals(idm[i], response[2 + i]);
+        }
+        // Verify PMm
+        for (int i = 0; i < 8; i++) {
+            assertEquals(pmm[i], response[10 + i]);
+        }
+    }
+
+    @Test
+    void testBuildFelicaPollingResponseNullIdmPmm() {
+        byte[] response = IfProtocol.buildFelicaPollingResponse(null, null);
+        assertNotNull(response);
+        assertEquals(18, response.length);
+        assertEquals(18, response[0]);
+        assertEquals(IfProtocol.FELICA_RES_POLLING, response[1]);
+    }
+
+    @Test
+    void testCardAccessPollingRoundTrip() {
+        // Build a CardAccess command containing a FeliCa Polling command
+        byte[] pollingData = {0x06, 0x04, (byte) 0xFF, (byte) 0xFF, 0x00, 0x00};
+        byte[] frame = IfProtocol.buildCardAccessCommand(pollingData);
+        IfProtocol.Message msg = IfProtocol.parseFrame(frame);
+        assertNotNull(msg);
+        assertEquals(IfProtocol.CMD_CARD_ACCESS, msg.getCommand());
+        assertTrue(IfProtocol.isFelicaPollingCommand(msg.getData()));
+    }
+
+    @Test
+    void testCardAccessThruRoundTrip() {
+        // Build a CardAccess command containing a Read Without Encryption command
+        byte[] readData = {0x10, 0x06, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08,
+            0x01, 0x09, 0x00, (byte) 0x80, 0x00, (byte) 0x8B};
+        byte[] frame = IfProtocol.buildCardAccessCommand(readData);
+        IfProtocol.Message msg = IfProtocol.parseFrame(frame);
+        assertNotNull(msg);
+        assertEquals(IfProtocol.CMD_CARD_ACCESS, msg.getCommand());
+        assertFalse(IfProtocol.isFelicaPollingCommand(msg.getData()));
+        assertEquals(0x06, IfProtocol.getFelicaCommandCode(msg.getData()));
+    }
+
     // ---- Helper Methods ----
 
     /**

@@ -45,6 +45,88 @@ public class IfProtocol {
     public static final byte ERR_CARD_ACCESS_BEFORE_OPEN = 0x01;
     public static final byte ERR_CARD_ACCESS_TIMEOUT = 0x10;
 
+    // FeliCa data link layer command codes
+    // In FeliCa data link layer: Data[0] = length, Data[1] = command code
+    /** FeliCa Polling command code */
+    public static final byte FELICA_CMD_POLLING = 0x04;
+    /** FeliCa Polling response code */
+    public static final byte FELICA_RES_POLLING = 0x05;
+
+    /**
+     * Extract the FeliCa command code from CardAccess data.
+     * In the FeliCa data link layer, the command code is at Data[1] (second byte).
+     * Data[0] is the length byte.
+     *
+     * @param data the FeliCa data link layer data
+     * @return the command code, or -1 if data is too short
+     */
+    public static int getFelicaCommandCode(byte[] data) {
+        if (data == null || data.length < 2) {
+            return -1;
+        }
+        return data[1] & 0xFF;
+    }
+
+    /**
+     * Check if the FeliCa data link layer data contains a Polling command (0x04).
+     *
+     * @param data the FeliCa data link layer data
+     * @return true if it is a Polling command
+     */
+    public static boolean isFelicaPollingCommand(byte[] data) {
+        return getFelicaCommandCode(data) == (FELICA_CMD_POLLING & 0xFF);
+    }
+
+    /**
+     * Extract the system code from a FeliCa Polling command.
+     * Polling command format: [LEN, 0x04, SystemCode(2bytes), RequestCode, TimeSlot]
+     *
+     * @param data the FeliCa Polling command data
+     * @return the 2-byte system code, or null if data is invalid
+     */
+    public static byte[] extractPollingSystemCode(byte[] data) {
+        if (data == null || data.length < 4) {
+            return null;
+        }
+        return new byte[]{data[2], data[3]};
+    }
+
+    /**
+     * Extract the time slot from a FeliCa Polling command.
+     * Polling command format: [LEN, 0x04, SystemCode(2bytes), RequestCode, TimeSlot]
+     *
+     * @param data the FeliCa Polling command data
+     * @return the time slot value, or 0x00 (single slot) if data is too short
+     */
+    public static byte extractPollingTimeSlot(byte[] data) {
+        if (data == null || data.length < 6) {
+            return 0x00;
+        }
+        return data[5];
+    }
+
+    /**
+     * Build a FeliCa Polling response in data link layer format.
+     * Response format: [LEN, 0x05, IDm(8bytes), PMm(8bytes)]
+     *
+     * @param idm the 8-byte IDm
+     * @param pmm the 8-byte PMm
+     * @return the Polling response data
+     */
+    public static byte[] buildFelicaPollingResponse(byte[] idm, byte[] pmm) {
+        // LEN(1) + ResponseCode(1) + IDm(8) + PMm(8) = 18
+        byte[] response = new byte[18];
+        response[0] = 18; // LEN
+        response[1] = FELICA_RES_POLLING;
+        if (idm != null) {
+            System.arraycopy(idm, 0, response, 2, Math.min(idm.length, 8));
+        }
+        if (pmm != null) {
+            System.arraycopy(pmm, 0, response, 10, Math.min(pmm.length, 8));
+        }
+        return response;
+    }
+
     private IfProtocol() {
         // Utility class
     }

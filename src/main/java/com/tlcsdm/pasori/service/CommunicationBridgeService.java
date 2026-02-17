@@ -220,7 +220,11 @@ public class CommunicationBridgeService {
 
     /**
      * Handle CardAccess command (0x30).
-     * Forward FeliCa data to the card via SDK thru command and return the response.
+     * Analyzes the FeliCa data link layer command code to determine the operation:
+     * <ul>
+     *   <li>Polling (0x04): Use SDK polling to detect cards and return IDm/PMm</li>
+     *   <li>Other commands: Forward FeliCa data to the card via SDK thru command</li>
+     * </ul>
      */
     private void handleCardAccessCommand(IfProtocol.Message message) {
         log(LogEntry.Direction.SYSTEM, "IF CardAccess command received");
@@ -235,18 +239,77 @@ public class CommunicationBridgeService {
         }
 
         byte[] felicaData = message.getData();
+        if (felicaData == null || felicaData.length < 2) {
+            byte[] exResponse = IfProtocol.buildExceptionResponse(
+                IfProtocol.CMD_CARD_ACCESS, IfProtocol.ERR_CARD_ACCESS_TIMEOUT);
+            responseQueue.offer(new QueuedMessage(exResponse));
+            log(LogEntry.Direction.SYSTEM, "IF CardAccess exception: invalid FeliCa data (too short)");
+            return;
+        }
+
+        int cmdCode = IfProtocol.getFelicaCommandCode(felicaData);
+        log(LogEntry.Direction.SYSTEM, "IF CardAccess FeliCa command: 0x" + String.format("%02X", cmdCode));
+
+        if (IfProtocol.isFelicaPollingCommand(felicaData)) {
+            handleCardAccessPolling(felicaData);
+        } else {
+            handleCardAccessThru(felicaData);
+        }
+    }
+
+    /**
+     * Handle CardAccess with FeliCa Polling command (0x04).
+     * Uses SDK polling to detect cards and returns IDm/PMm in FeliCa data link layer format.
+     *
+     * @param felicaData the FeliCa Polling command data
+     */
+    private void handleCardAccessPolling(byte[] felicaData) {
+        byte[] systemCode = IfProtocol.extractPollingSystemCode(felicaData);
+        byte[][] cardData;
+
+        if (systemCode != null) {
+            cardData = pasoriSdkService.pollCard(systemCode);
+            log(LogEntry.Direction.SYSTEM, "IF CardAccess Polling with system code: "
+                + PaSoRiSdkService.bytesToHex(systemCode));
+        } else {
+            cardData = pasoriSdkService.pollCard();
+            log(LogEntry.Direction.SYSTEM, "IF CardAccess Polling with default system code");
+        }
+
+        if (cardData != null) {
+            byte[] idm = cardData[0];
+            byte[] pmm = cardData[1];
+            byte[] pollingResponse = IfProtocol.buildFelicaPollingResponse(idm, pmm);
+            byte[] response = IfProtocol.buildCardAccessResponse(pollingResponse);
+            responseQueue.offer(new QueuedMessage(response));
+            log(LogEntry.Direction.SYSTEM, "IF CardAccess Polling response: IDm="
+                + PaSoRiSdkService.bytesToHex(idm) + " PMm=" + PaSoRiSdkService.bytesToHex(pmm));
+        } else {
+            byte[] exResponse = IfProtocol.buildExceptionResponse(
+                IfProtocol.CMD_CARD_ACCESS, IfProtocol.ERR_CARD_ACCESS_TIMEOUT);
+            responseQueue.offer(new QueuedMessage(exResponse));
+            log(LogEntry.Direction.SYSTEM, "IF CardAccess Polling: no card found");
+        }
+    }
+
+    /**
+     * Handle CardAccess with FeliCa data send/receive (non-Polling commands).
+     * Forwards the FeliCa data to the card via SDK thru command and returns the response.
+     *
+     * @param felicaData the FeliCa command data to send
+     */
+    private void handleCardAccessThru(byte[] felicaData) {
         byte[] cardResponse = pasoriSdkService.thruCommand(felicaData);
 
         if (cardResponse != null) {
             byte[] response = IfProtocol.buildCardAccessResponse(cardResponse);
             responseQueue.offer(new QueuedMessage(response));
-            log(LogEntry.Direction.SYSTEM, "IF CardAccess response sent (" + cardResponse.length + " bytes)");
+            log(LogEntry.Direction.SYSTEM, "IF CardAccess thru response sent (" + cardResponse.length + " bytes)");
         } else {
-            // Timeout or error - send exception response
             byte[] exResponse = IfProtocol.buildExceptionResponse(
                 IfProtocol.CMD_CARD_ACCESS, IfProtocol.ERR_CARD_ACCESS_TIMEOUT);
             responseQueue.offer(new QueuedMessage(exResponse));
-            log(LogEntry.Direction.SYSTEM, "IF CardAccess exception: timeout/error");
+            log(LogEntry.Direction.SYSTEM, "IF CardAccess thru exception: timeout/error");
         }
     }
 
