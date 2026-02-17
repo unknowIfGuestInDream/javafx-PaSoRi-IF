@@ -176,6 +176,41 @@ public class PaSoRiSdkService {
     }
 
     /**
+     * Send a raw FeliCa command through the reader/writer to the card
+     * and receive the response (thru command).
+     *
+     * @param sendData the FeliCa command data to send
+     * @return the response data from the card, or null on error
+     */
+    public byte[] thruCommand(byte[] sendData) {
+        if (!readerOpened || felicaLib == null) {
+            notifyError("Reader/Writer not opened");
+            return null;
+        }
+        if (sendData == null || sendData.length == 0) {
+            notifyError("Send data is empty");
+            return null;
+        }
+
+        Memory sendMem = new Memory(sendData.length);
+        sendMem.write(0, sendData, 0, sendData.length);
+
+        // Allocate receive buffer (max FeliCa response size)
+        int maxReceiveSize = 256;
+        Memory receiveMem = new Memory(maxReceiveSize);
+        IntByReference receiveLength = new IntByReference(maxReceiveSize);
+
+        boolean result = felicaLib.thru(sendMem, sendData.length, receiveMem, receiveLength);
+        if (result && receiveLength.getValue() > 0) {
+            byte[] response = receiveMem.getByteArray(0, receiveLength.getValue());
+            return response;
+        } else {
+            notifyError("thru command failed: " + getLastErrorDescription());
+            return null;
+        }
+    }
+
+    /**
      * Check if the FeliCa library is initialized.
      *
      * @return true if initialized
