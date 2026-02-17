@@ -202,8 +202,7 @@ public class PaSoRiSdkService {
 
         boolean result = felicaLib.thru(sendMem, sendData.length, receiveMem, receiveLength);
         if (result && receiveLength.getValue() > 0) {
-            byte[] response = receiveMem.getByteArray(0, receiveLength.getValue());
-            return response;
+            return receiveMem.getByteArray(0, receiveLength.getValue());
         } else {
             notifyError("thru command failed: " + getLastErrorDescription());
             return null;
