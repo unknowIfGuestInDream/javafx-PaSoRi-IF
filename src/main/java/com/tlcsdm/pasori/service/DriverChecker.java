@@ -3,6 +3,9 @@
  */
 package com.tlcsdm.pasori.service;
 
+import com.sun.jna.Library;
+import com.sun.jna.Native;
+
 /**
  * Utility class for checking PaSoRi driver installation status.
  *
@@ -18,13 +21,17 @@ public final class DriverChecker {
     /**
      * Check whether the PaSoRi (FeliCa port) driver is installed on the system.
      *
-     * <p>TODO: Implement actual driver detection logic, e.g. by checking
-     * Windows registry entries or attempting to load the FeliCa library.</p>
+     * <p>Attempts to load {@code felica.dll} via JNA. If the library cannot be
+     * found on the system library path, the driver is considered not installed.</p>
      *
      * @return true if the driver is installed, false otherwise
      */
     public static boolean isDriverInstalled() {
-        // Stub implementation - to be completed with actual driver detection
-        return true;
+        try {
+            Native.load("felica", Library.class);
+            return true;
+        } catch (UnsatisfiedLinkError e) {
+            return false;
+        }
     }
 }
