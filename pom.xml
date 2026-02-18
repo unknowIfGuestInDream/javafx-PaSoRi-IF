@@ -17,7 +17,7 @@
         <maven.compiler.source>21</maven.compiler.source>
         <maven.compiler.target>21</maven.compiler.target>
         <maven.build.timestamp.format>yyyy-MM-dd</maven.build.timestamp.format>
-        <javafx.version>21.0.9</javafx.version>
+        <javafx.version>21.0.10</javafx.version>
         <jserialcomm.version>2.10.4</jserialcomm.version>
         <jna.version>5.17.0</jna.version>
         <preferencesfx.version>11.17.0</preferencesfx.version>
