@@ -130,9 +130,10 @@ public class MainController implements Initializable {
         // Setup UI states
         updateConnectionButtons();
 
-        // Check driver installation at startup
+        // Check driver installation at startup by attempting to load felica.dll
         if (!DriverChecker.isDriverInstalled()) {
             addLogEntry(new LogEntry(LogEntry.Direction.SYSTEM, I18N.get("system.driverNotInstalled"), false));
+            Platform.runLater(this::showDriverNotInstalledDialog);
         }
 
         addLogEntry(new LogEntry(LogEntry.Direction.SYSTEM, I18N.get("system.appStarted"), false));
@@ -522,6 +523,18 @@ public class MainController implements Initializable {
             data[i / 2] = (byte) ((high << 4) + low);
         }
         return data;
+    }
+
+    /**
+     * Show a warning dialog informing the user that the FeliCa SDK is not installed.
+     */
+    private void showDriverNotInstalledDialog() {
+        Alert alert = new Alert(Alert.AlertType.WARNING);
+        alert.setTitle(I18N.get("system.driverNotInstalled.title"));
+        alert.setHeaderText(I18N.get("system.driverNotInstalled.header"));
+        alert.setContentText(I18N.get("system.driverNotInstalled.content"));
+        setDialogIcon((Stage) alert.getDialogPane().getScene().getWindow());
+        alert.showAndWait();
     }
 
     private void showAlert(String title, String message) {
