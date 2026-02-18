@@ -16,41 +16,49 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 
 /**
- * Bridge service that manages communication between PaSoRi device (via SDK) and Panasonic アンテナIF device.
- * 
- * This service:
- * - Uses the FeliCa SDK to communicate with PaSoRi (polling for cards, reading IDm/PMm)
- * - Receives data from Panasonic アンテナIF via serial port
- * - Forwards card data from PaSoRi to アンテナIF
- * - Uses message queues to ensure reliable message delivery
- * - Logs all communication for debugging purposes
+ * Bridge service that manages communication between PaSoRi device (via SDK) and IF device.
+ *
+ * <p>This service acts as a relay (中継器) between IF and PaSoRi using the IF communication protocol:</p>
+ * <ul>
+ *   <li>Receives IF protocol commands from the IF device via serial port</li>
+ *   <li>Processes commands: Open, Close, CardAccess, SetParameter</li>
+ *   <li>Uses the FeliCa SDK to communicate with PaSoRi NFC reader</li>
+ *   <li>Sends IF protocol responses back to the IF device</li>
+ * </ul>
+ *
+ * <p>The relay always accepts subsequent commands. No FeliCa command timeout monitoring
+ * is performed on the relay side. Presence checks are not performed; only NFC packets
+ * received via CardAccess are sent to the card.</p>
  */
 public class CommunicationBridgeService {
 
     private final PaSoRiSdkService pasoriSdkService;
     private final SerialPortService antennaIfService;
-    
-    // Message queue for PaSoRi -> Antenna messages
-    private final BlockingQueue<QueuedMessage> pasoriToAntennaQueue;
-    
-    // Background executor for processing queued messages and polling
+
+    // Message queue for response messages to send back to IF device
+    private final BlockingQueue<QueuedMessage> responseQueue;
+
+    // Frame accumulator for assembling IF protocol frames from serial data
+    private final IfProtocol.FrameAccumulator frameAccumulator;
+
+    // Background executor for processing queued messages
     private final ExecutorService messageProcessor;
-    
+
     // Maximum retry attempts for message delivery before discarding
     private static final int MAX_RETRY_ATTEMPTS = 100;
-    
+
     private Consumer<LogEntry> logCallback;
     private volatile boolean bridgingEnabled = false;
-    private volatile boolean pollingActive = false;
+    private volatile boolean nfcCarrierOn = false;
     private volatile boolean running = true;
-    
+
     /**
      * Wrapper class for queued messages with retry tracking.
      */
     private static class QueuedMessage {
         final byte[] data;
         int retryCount;
-        
+
         QueuedMessage(byte[] data) {
             this.data = data;
             this.retryCount = 0;
@@ -60,8 +68,9 @@ public class CommunicationBridgeService {
     public CommunicationBridgeService() {
         this.pasoriSdkService = new PaSoRiSdkService();
         this.antennaIfService = new SerialPortService();
-        this.pasoriToAntennaQueue = new LinkedBlockingQueue<>();
-        
+        this.responseQueue = new LinkedBlockingQueue<>();
+        this.frameAccumulator = new IfProtocol.FrameAccumulator();
+
         // Create named thread factory for better debugging
         ThreadFactory threadFactory = new ThreadFactory() {
             private final AtomicInteger threadNumber = new AtomicInteger(1);
@@ -72,61 +81,35 @@ public class CommunicationBridgeService {
                 return t;
             }
         };
-        this.messageProcessor = Executors.newFixedThreadPool(2, threadFactory);
-        
+        this.messageProcessor = Executors.newFixedThreadPool(1, threadFactory);
+
         setupCallbacks();
         startMessageProcessors();
     }
-    
+
     /**
-     * Start background threads to process queued messages.
+     * Start background thread to process response queue and send responses to IF device.
      */
     private void startMessageProcessors() {
-        // Processor for PaSoRi -> Antenna messages (from SDK polling results)
+        // Response sender thread: sends queued response frames to IF device
         messageProcessor.submit(() -> {
             while (running) {
                 try {
-                    QueuedMessage message = pasoriToAntennaQueue.poll(100, TimeUnit.MILLISECONDS);
+                    QueuedMessage message = responseQueue.poll(100, TimeUnit.MILLISECONDS);
                     if (message != null && antennaIfService.isConnected()) {
                         try {
                             int bytesWritten = antennaIfService.sendData(message.data);
                             if (bytesWritten < 0) {
-                                requeue(message, pasoriToAntennaQueue, "Antenna");
+                                requeue(message, responseQueue, "IF");
+                            } else {
+                                log(LogEntry.Direction.PASORI_TO_ANTENNA, message.data);
                             }
                         } catch (Exception e) {
-                            requeue(message, pasoriToAntennaQueue, "Antenna");
+                            requeue(message, responseQueue, "IF");
                         }
                     } else if (message != null) {
-                        requeue(message, pasoriToAntennaQueue, "Antenna");
+                        requeue(message, responseQueue, "IF");
                     }
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
-                    break;
-                }
-            }
-        });
-        
-        // Polling thread for PaSoRi SDK card detection
-        messageProcessor.submit(() -> {
-            while (running) {
-                try {
-                    if (pollingActive && pasoriSdkService.isReaderOpened()) {
-                        byte[][] cardData = pasoriSdkService.pollCard();
-                        if (cardData != null) {
-                            byte[] idm = cardData[0];
-                            byte[] pmm = cardData[1];
-                            log(LogEntry.Direction.PASORI_TO_ANTENNA,
-                                "Card detected - IDm: " + PaSoRiSdkService.bytesToHex(idm)
-                                + " PMm: " + PaSoRiSdkService.bytesToHex(pmm));
-                            
-                            if (bridgingEnabled) {
-                                // Forward card IDm data to Antenna IF
-                                byte[] convertedData = convertPaSoRiToAntennaProtocol(idm);
-                                pasoriToAntennaQueue.offer(new QueuedMessage(convertedData));
-                            }
-                        }
-                    }
-                    Thread.sleep(500); // Poll interval
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
                     break;
@@ -134,7 +117,7 @@ public class CommunicationBridgeService {
             }
         });
     }
-    
+
     /**
      * Re-queue a message with retry limit checking.
      */
@@ -148,7 +131,7 @@ public class CommunicationBridgeService {
                 Thread.currentThread().interrupt();
             }
         } else {
-            log(LogEntry.Direction.SYSTEM, 
+            log(LogEntry.Direction.SYSTEM,
                 "Message to " + targetName + " discarded after max retries (size: " + message.data.length + " bytes)");
         }
     }
@@ -160,19 +143,215 @@ public class CommunicationBridgeService {
         pasoriSdkService.setInfoCallback(info ->
             log(LogEntry.Direction.SYSTEM, "PaSoRi SDK: " + info));
 
-        // Forward data received from アンテナIF to log
+        // IF protocol frame processing: accumulate and process commands from IF device
         antennaIfService.setDataReceivedCallback(data -> {
             log(LogEntry.Direction.ANTENNA_TO_PASORI, data);
+            if (bridgingEnabled) {
+                byte[] frame = frameAccumulator.feed(data);
+                if (frame != null) {
+                    processIfCommand(frame);
+                }
+            }
         });
 
         // Error callbacks
-        antennaIfService.setErrorCallback(error -> 
-            log(LogEntry.Direction.SYSTEM, "アンテナIF Error: " + error));
+        antennaIfService.setErrorCallback(error ->
+            log(LogEntry.Direction.SYSTEM, "IF Error: " + error));
+    }
+
+    /**
+     * Process a complete IF protocol command frame received from the IF device.
+     *
+     * @param frame the raw frame bytes
+     */
+    private void processIfCommand(byte[] frame) {
+        IfProtocol.Message message = IfProtocol.parseFrame(frame);
+        if (message == null) {
+            log(LogEntry.Direction.SYSTEM, "Invalid IF protocol frame received");
+            return;
+        }
+
+        switch (message.getCommand()) {
+            case IfProtocol.CMD_OPEN -> handleOpenCommand();
+            case IfProtocol.CMD_CLOSE -> handleCloseCommand();
+            case IfProtocol.CMD_CARD_ACCESS -> handleCardAccessCommand(message);
+            case IfProtocol.CMD_SET_PARAMETER -> handleSetParameterCommand(message);
+            default -> log(LogEntry.Direction.SYSTEM,
+                "Unknown IF command: 0x" + String.format("%02X", message.getCommand()));
+        }
+    }
+
+    /**
+     * Handle Open command (0x10).
+     * Initialize the FeliCa library and open the reader (NFC carrier on).
+     */
+    private void handleOpenCommand() {
+        log(LogEntry.Direction.SYSTEM, "IF Open command received");
+
+        boolean success = true;
+        if (!pasoriSdkService.isInitialized()) {
+            success = pasoriSdkService.initializeLibrary();
+        }
+        if (success && !pasoriSdkService.isReaderOpened()) {
+            success = pasoriSdkService.openReaderAuto();
+        }
+
+        nfcCarrierOn = success;
+        byte resCode = success ? IfProtocol.RES_CODE_OK : IfProtocol.RES_CODE_ERROR;
+        byte[] response = IfProtocol.buildOpenResponse(resCode);
+        responseQueue.offer(new QueuedMessage(response));
+        log(LogEntry.Direction.SYSTEM, "IF Open response: " + (success ? "OK" : "Error"));
+    }
+
+    /**
+     * Handle Close command (0x20).
+     * Close the reader and dispose the library (NFC carrier off).
+     */
+    private void handleCloseCommand() {
+        log(LogEntry.Direction.SYSTEM, "IF Close command received");
+
+        nfcCarrierOn = false;
+        pasoriSdkService.closeReader();
+
+        byte[] response = IfProtocol.buildCloseResponse(IfProtocol.RES_CODE_OK);
+        responseQueue.offer(new QueuedMessage(response));
+        log(LogEntry.Direction.SYSTEM, "IF Close response: OK");
+    }
+
+    /**
+     * Handle CardAccess command (0x30).
+     * Analyzes the FeliCa data link layer command code to determine the operation:
+     * <ul>
+     *   <li>Polling (0x04): Use SDK polling to detect cards and return IDm/PMm</li>
+     *   <li>Other commands: Forward FeliCa data to the card via SDK thru command</li>
+     * </ul>
+     */
+    private void handleCardAccessCommand(IfProtocol.Message message) {
+        log(LogEntry.Direction.SYSTEM, "IF CardAccess command received");
+
+        // Check if Open has been called
+        if (!nfcCarrierOn || !pasoriSdkService.isReaderOpened()) {
+            byte[] exResponse = IfProtocol.buildExceptionResponse(
+                IfProtocol.CMD_CARD_ACCESS, IfProtocol.ERR_CARD_ACCESS_BEFORE_OPEN);
+            responseQueue.offer(new QueuedMessage(exResponse));
+            log(LogEntry.Direction.SYSTEM, "IF CardAccess exception: Open not called");
+            return;
+        }
+
+        byte[] felicaData = message.getData();
+        if (felicaData == null || felicaData.length < 2) {
+            byte[] exResponse = IfProtocol.buildExceptionResponse(
+                IfProtocol.CMD_CARD_ACCESS, IfProtocol.ERR_CARD_ACCESS_TIMEOUT);
+            responseQueue.offer(new QueuedMessage(exResponse));
+            log(LogEntry.Direction.SYSTEM, "IF CardAccess exception: invalid FeliCa data (too short)");
+            return;
+        }
+
+        int cmdCode = IfProtocol.getFelicaCommandCode(felicaData);
+        log(LogEntry.Direction.SYSTEM, "IF CardAccess FeliCa command: 0x" + String.format("%02X", cmdCode));
+
+        if (IfProtocol.isFelicaPollingCommand(felicaData)) {
+            handleCardAccessPolling(felicaData);
+        } else {
+            handleCardAccessThru(felicaData);
+        }
+    }
+
+    /**
+     * Handle CardAccess with FeliCa Polling command (0x04).
+     * Uses SDK polling to detect cards and returns IDm/PMm in FeliCa data link layer format.
+     *
+     * @param felicaData the FeliCa Polling command data
+     */
+    private void handleCardAccessPolling(byte[] felicaData) {
+        byte[] systemCode = IfProtocol.extractPollingSystemCode(felicaData);
+        byte[][] cardData;
+
+        if (systemCode != null) {
+            cardData = pasoriSdkService.pollCard(systemCode);
+            log(LogEntry.Direction.SYSTEM, "IF CardAccess Polling with system code: "
+                + PaSoRiSdkService.bytesToHex(systemCode));
+        } else {
+            cardData = pasoriSdkService.pollCard();
+            log(LogEntry.Direction.SYSTEM, "IF CardAccess Polling with default system code");
+        }
+
+        if (cardData != null) {
+            byte[] idm = cardData[0];
+            byte[] pmm = cardData[1];
+            byte[] pollingResponse = IfProtocol.buildFelicaPollingResponse(idm, pmm);
+            byte[] response = IfProtocol.buildCardAccessResponse(pollingResponse);
+            responseQueue.offer(new QueuedMessage(response));
+            log(LogEntry.Direction.SYSTEM, "IF CardAccess Polling response: IDm="
+                + PaSoRiSdkService.bytesToHex(idm) + " PMm=" + PaSoRiSdkService.bytesToHex(pmm));
+        } else {
+            byte[] exResponse = IfProtocol.buildExceptionResponse(
+                IfProtocol.CMD_CARD_ACCESS, IfProtocol.ERR_CARD_ACCESS_TIMEOUT);
+            responseQueue.offer(new QueuedMessage(exResponse));
+            log(LogEntry.Direction.SYSTEM, "IF CardAccess Polling: no card found");
+        }
+    }
+
+    /**
+     * Handle CardAccess with FeliCa data send/receive (non-Polling commands).
+     * Forwards the FeliCa data to the card via SDK thru command and returns the response.
+     *
+     * @param felicaData the FeliCa command data to send
+     */
+    private void handleCardAccessThru(byte[] felicaData) {
+        byte[] cardResponse = pasoriSdkService.thruCommand(felicaData);
+
+        if (cardResponse != null) {
+            byte[] response = IfProtocol.buildCardAccessResponse(cardResponse);
+            responseQueue.offer(new QueuedMessage(response));
+            log(LogEntry.Direction.SYSTEM, "IF CardAccess thru response sent (" + cardResponse.length + " bytes)");
+        } else {
+            byte[] exResponse = IfProtocol.buildExceptionResponse(
+                IfProtocol.CMD_CARD_ACCESS, IfProtocol.ERR_CARD_ACCESS_TIMEOUT);
+            responseQueue.offer(new QueuedMessage(exResponse));
+            log(LogEntry.Direction.SYSTEM, "IF CardAccess thru exception: timeout/error");
+        }
+    }
+
+    /**
+     * Handle SetParameter command (0x40).
+     * Configure parameters for the NFC relay library.
+     */
+    private void handleSetParameterCommand(IfProtocol.Message message) {
+        log(LogEntry.Direction.SYSTEM, "IF SetParameter command received");
+
+        byte[] data = message.getData();
+        boolean success = false;
+
+        if (data != null && data.length >= 1) {
+            byte subCmd = data[0];
+            if (subCmd == 0x01 && data.length >= 2) {
+                // Set card command maximum response timeout
+                // Data[1] (and optional Data[2]) contain the timeout value
+                int timeout;
+                if (data.length >= 3) {
+                    timeout = ((data[1] & 0xFF) << 8) | (data[2] & 0xFF);
+                } else {
+                    timeout = data[1] & 0xFF;
+                }
+                if (pasoriSdkService.isInitialized()) {
+                    success = true;
+                    log(LogEntry.Direction.SYSTEM, "IF SetParameter: timeout set to " + timeout + "ms");
+                }
+            } else {
+                log(LogEntry.Direction.SYSTEM, "IF SetParameter: unknown sub-command 0x"
+                    + String.format("%02X", subCmd));
+            }
+        }
+
+        byte resCode = success ? IfProtocol.RES_CODE_OK : IfProtocol.RES_CODE_ERROR;
+        byte[] response = IfProtocol.buildSetParameterResponse(resCode);
+        responseQueue.offer(new QueuedMessage(response));
     }
 
     /**
      * Connect to PaSoRi device via FeliCa SDK (auto-detect).
-     * 
+     *
      * @return true if connection successful
      */
     public boolean connectPaSoRi() {
@@ -183,7 +362,7 @@ public class CommunicationBridgeService {
         }
         boolean result = pasoriSdkService.openReaderAuto();
         if (result) {
-            pollingActive = true;
+            nfcCarrierOn = true;
             log(LogEntry.Direction.SYSTEM, "PaSoRi connected via SDK (auto-detect)");
         }
         return result;
@@ -193,36 +372,38 @@ public class CommunicationBridgeService {
      * Disconnect from PaSoRi device.
      */
     public void disconnectPaSoRi() {
-        pollingActive = false;
+        nfcCarrierOn = false;
         pasoriSdkService.closeReader();
         log(LogEntry.Direction.SYSTEM, "PaSoRi disconnected");
     }
 
     /**
-     * Connect to Panasonic アンテナIF device via USB CDC-ACM.
-     * 
+     * Connect to IF device via USB CDC-ACM.
+     *
      * @param config serial port configuration
      * @return true if connection successful
      */
     public boolean connectAntennaIf(SerialPortConfig config) {
+        frameAccumulator.reset();
         boolean result = antennaIfService.connect(config);
         if (result) {
-            log(LogEntry.Direction.SYSTEM, "アンテナIF connected on " + config.getPortName());
+            log(LogEntry.Direction.SYSTEM, "IF connected on " + config.getPortName());
         }
         return result;
     }
 
     /**
-     * Disconnect from アンテナIF device.
+     * Disconnect from IF device.
      */
     public void disconnectAntennaIf() {
         antennaIfService.disconnect();
-        log(LogEntry.Direction.SYSTEM, "アンテナIF disconnected");
+        frameAccumulator.reset();
+        log(LogEntry.Direction.SYSTEM, "IF disconnected");
     }
 
     /**
      * Enable or disable automatic data bridging between devices.
-     * 
+     *
      * @param enabled true to enable bridging
      */
     public void setBridgingEnabled(boolean enabled) {
@@ -232,7 +413,7 @@ public class CommunicationBridgeService {
 
     /**
      * Check if bridging is enabled.
-     * 
+     *
      * @return true if bridging is enabled
      */
     public boolean isBridgingEnabled() {
@@ -240,8 +421,8 @@ public class CommunicationBridgeService {
     }
 
     /**
-     * Manually send data to アンテナIF device.
-     * 
+     * Manually send data to IF device.
+     *
      * @param data the data to send
      * @return bytes written or -1 on error
      */
@@ -252,7 +433,7 @@ public class CommunicationBridgeService {
 
     /**
      * Check if PaSoRi is connected via SDK.
-     * 
+     *
      * @return true if connected
      */
     public boolean isPaSoRiConnected() {
@@ -260,8 +441,8 @@ public class CommunicationBridgeService {
     }
 
     /**
-     * Check if アンテナIF is connected.
-     * 
+     * Check if IF device is connected.
+     *
      * @return true if connected
      */
     public boolean isAntennaIfConnected() {
@@ -270,7 +451,7 @@ public class CommunicationBridgeService {
 
     /**
      * Set the log callback for communication logging.
-     * 
+     *
      * @param callback the callback function
      */
     public void setLogCallback(Consumer<LogEntry> callback) {
@@ -282,9 +463,9 @@ public class CommunicationBridgeService {
      */
     public void shutdown() {
         bridgingEnabled = false;
-        pollingActive = false;
+        nfcCarrierOn = false;
         running = false;
-        
+
         // Shutdown message processor threads
         messageProcessor.shutdown();
         try {
@@ -295,10 +476,10 @@ public class CommunicationBridgeService {
             messageProcessor.shutdownNow();
             Thread.currentThread().interrupt();
         }
-        
+
         // Clear any remaining queued messages
-        pasoriToAntennaQueue.clear();
-        
+        responseQueue.clear();
+
         pasoriSdkService.shutdown();
         antennaIfService.disconnect();
         log(LogEntry.Direction.SYSTEM, "Communication bridge shutdown");
@@ -314,19 +495,5 @@ public class CommunicationBridgeService {
         if (logCallback != null) {
             logCallback.accept(new LogEntry(direction, message, false));
         }
-    }
-
-    /**
-     * Convert data received from PaSoRi to the protocol format expected by Antenna device.
-     * 
-     * @param data the raw data received from PaSoRi (e.g. card IDm)
-     * @return the converted data in Antenna protocol format
-     */
-    private byte[] convertPaSoRiToAntennaProtocol(byte[] data) {
-        if (data == null) {
-            return null;
-        }
-        // TODO: Implement PaSoRi to Antenna protocol conversion
-        return data;
     }
 }

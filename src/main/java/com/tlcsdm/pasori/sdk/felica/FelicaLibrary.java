@@ -250,4 +250,26 @@ public interface FelicaLibrary extends Library {
         byte card_index,
         CardInformation card_information
     );
+
+    // ---- Raw communication ----
+
+    /**
+     * Send a raw FeliCa command through the reader/writer to the card
+     * and receive the response.
+     *
+     * <p>This is used for transparent communication with FeliCa cards
+     * at the data link layer level.</p>
+     *
+     * @param send_data    pointer to the command data to send
+     * @param send_length  length of the command data
+     * @param receive_data pointer to buffer for the response data
+     * @param receive_length pointer to receive the length of response data
+     * @return true if successful
+     */
+    boolean thru(
+        Pointer send_data,
+        int send_length,
+        Pointer receive_data,
+        IntByReference receive_length
+    );
 }
