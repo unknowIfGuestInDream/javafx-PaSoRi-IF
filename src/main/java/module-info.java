@@ -5,6 +5,9 @@ module com.tlcsdm.pasori {
     requires com.sun.jna;
     requires com.sun.jna.platform;
     requires com.dlsc.preferencesfx;
+    requires org.kordamp.ikonli.core;
+    requires org.kordamp.ikonli.javafx;
+    requires org.kordamp.ikonli.material;
     requires atlantafx.base;
     requires java.prefs;
     requires com.google.gson;
