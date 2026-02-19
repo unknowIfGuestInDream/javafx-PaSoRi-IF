@@ -30,7 +30,7 @@ To include tests, use:
 
 Extracts the Maven project version, locates the built jar, and copies all necessary files into the `staging/` directory.
 
-### 3. Download JRE
+### 3. Create Custom JRE
 
 ```powershell
 Push-Location staging
@@ -38,7 +38,9 @@ Push-Location staging
 Pop-Location
 ```
 
-Downloads the Adoptium JRE 21 for Windows x64 into the staging directory.
+Downloads the Adoptium JDK 21 for Windows x64, uses `jdeps` to analyze the application jar
+for required JDK modules, then creates a minimal custom JRE with `jlink` containing only
+those modules. The downloaded JDK is cleaned up after the custom JRE is created.
 
 ### 4. Package artifact
 
