@@ -3,14 +3,26 @@
     Create a minimal custom JRE using jlink.
 
 .DESCRIPTION
-    Uses jdeps to analyze the application jar for required JDK modules,
-    then creates a custom runtime image with jlink containing only those modules.
+    Downloads the Adoptium JDK, uses jdeps to analyze the application jar for required
+    JDK modules, then creates a custom runtime image with jlink containing only those modules.
     This significantly reduces the JRE size compared to a full JRE download.
     This script should be called from the staging directory containing the application jar.
-    Requires JDK 21+ with jlink and jdeps on the PATH.
 #>
 
 $ErrorActionPreference = 'Stop'
+
+# see https://api.adoptium.net/q/swagger-ui/#/Binary/getBinaryByVersion
+$winApi = 'https://api.adoptium.net/v3/binary/version/jdk-21.0.10%2B7/windows/x64/jdk/hotspot/normal/eclipse?project=jdk'
+$jdkDir = 'jdk-21.0.10+7'
+
+# Download and extract JDK
+Write-Host "Downloading Adoptium JDK..." -ForegroundColor Cyan
+Invoke-WebRequest -Uri $winApi -OutFile 'jdk.zip'
+Expand-Archive -Path 'jdk.zip' -DestinationPath '.' -Force
+Remove-Item -Path 'jdk.zip' -Force
+
+$jdepsCmd = Join-Path $jdkDir 'bin' 'jdeps.exe'
+$jlinkCmd = Join-Path $jdkDir 'bin' 'jlink.exe'
 
 # Find the application jar in the current directory
 $jar = Get-ChildItem -Path '*.jar' -File | Select-Object -First 1
@@ -22,7 +34,7 @@ Write-Host "Analyzing module dependencies for $($jar.Name)..." -ForegroundColor 
 $modules = $null
 $jdepsErr = $null
 try {
-    $modules = & jdeps --ignore-missing-deps --multi-release 21 --print-module-deps $jar.Name 2>&1 |
+    $modules = & $jdepsCmd --ignore-missing-deps --multi-release 21 --print-module-deps $jar.Name 2>&1 |
         Where-Object { $_ -is [string] } | Select-Object -Last 1
     if ($LASTEXITCODE -ne 0) { $modules = $null }
 } catch {
@@ -52,7 +64,10 @@ Write-Host "Creating custom JRE with jlink..." -ForegroundColor Cyan
 #   --no-man-pages:   Exclude man pages
 #   --no-header-files: Exclude C header files
 #   --compress zip-9: Maximum compression
-& jlink --add-modules $modules --output jre --strip-debug --no-man-pages --no-header-files --compress zip-9
+& $jlinkCmd --add-modules $modules --output jre --strip-debug --no-man-pages --no-header-files --compress zip-9
 if ($LASTEXITCODE -ne 0) { throw "jlink failed with exit code $LASTEXITCODE" }
+
+# Clean up downloaded JDK
+Remove-Item -Path $jdkDir -Recurse -Force
 
 Write-Host "Custom JRE created successfully." -ForegroundColor Green

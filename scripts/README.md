@@ -38,10 +38,9 @@ Push-Location staging
 Pop-Location
 ```
 
-Uses `jdeps` and `jlink` to create a minimal custom JRE in the staging directory.
-The script analyzes the application jar for required JDK modules and creates
-a custom runtime image with only those modules, significantly reducing the
-JRE size compared to a full JRE download.
+Downloads the Adoptium JDK 21 for Windows x64, uses `jdeps` to analyze the application jar
+for required JDK modules, then creates a minimal custom JRE with `jlink` containing only
+those modules. The downloaded JDK is cleaned up after the custom JRE is created.
 
 ### 4. Package artifact
 
