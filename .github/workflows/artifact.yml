@@ -30,7 +30,7 @@ jobs:
         run: |
           & scripts\resolve-version.ps1
 
-      - name: Download JRE
+      - name: Create Custom JRE with jlink
         shell: pwsh
         run: |
           Push-Location staging
