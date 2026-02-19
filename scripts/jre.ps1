@@ -12,8 +12,9 @@
 $ErrorActionPreference = 'Stop'
 
 # see https://api.adoptium.net/q/swagger-ui/#/Binary/getBinaryByVersion
-$winApi = 'https://api.adoptium.net/v3/binary/version/jdk-21.0.10%2B7/windows/x64/jdk/hotspot/normal/eclipse?project=jdk'
+$jdkVersion = 'jdk-21.0.10%2B7'
 $jdkDir = 'jdk-21.0.10+7'
+$winApi = "https://api.adoptium.net/v3/binary/version/$jdkVersion/windows/x64/jdk/hotspot/normal/eclipse?project=jdk"
 
 # Download and extract JDK
 Write-Host "Downloading Adoptium JDK..." -ForegroundColor Cyan
