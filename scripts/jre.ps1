@@ -20,17 +20,23 @@ Write-Host "Analyzing module dependencies for $($jar.Name)..." -ForegroundColor 
 
 # Use jdeps to determine required JDK modules from the fat jar
 $modules = $null
+$jdepsErr = $null
 try {
-    $modules = & jdeps --ignore-missing-deps --multi-release 21 --print-module-deps $jar.Name 2>$null
+    $modules = & jdeps --ignore-missing-deps --multi-release 21 --print-module-deps $jar.Name 2>&1 |
+        Where-Object { $_ -is [string] } | Select-Object -Last 1
     if ($LASTEXITCODE -ne 0) { $modules = $null }
 } catch {
+    $jdepsErr = $_.Exception.Message
     $modules = $null
 }
 
 if (-not $modules -or $modules.Trim() -eq '') {
-    # Fallback to a known set of modules if jdeps fails
+    # Fallback: conservative set covering JavaFX, serial I/O, JNA, logging (Logback),
+    # Preferences API, XML processing, and sun.misc.Unsafe access.
+    # Derived from module-info.java requires and transitive runtime dependencies.
     $modules = 'java.base,java.desktop,java.logging,java.management,java.naming,java.prefs,java.xml,jdk.unsupported'
     Write-Host "jdeps analysis failed, using fallback modules: $modules" -ForegroundColor Yellow
+    if ($jdepsErr) { Write-Host "  Reason: $jdepsErr" -ForegroundColor Yellow }
 } else {
     $modules = $modules.Trim()
     Write-Host "Detected modules: $modules" -ForegroundColor Cyan
