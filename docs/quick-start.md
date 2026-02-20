@@ -4,7 +4,7 @@ If you are not familiar with Java development, the easiest way to get a working 
 
 ## Option 1: Download a Release
 
-Check the [Releases](../../../releases) page for pre-built zip files. Extract and run `start.bat` — no Java installation required.
+Check the [Releases](https://github.com/unknowIfGuestInDream/javafx-PaSoRi-IF/releases) page for pre-built zip files. Extract and run `start.bat` — no Java installation required.
 
 ## Option 2: Build from Source (No Java Knowledge Required)
 

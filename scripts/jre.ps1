@@ -18,6 +18,10 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
+if (-not (Test-Path $StagingDir)) {
+    throw "Staging directory not found: $StagingDir"
+}
+
 Push-Location $StagingDir
 try {
 
