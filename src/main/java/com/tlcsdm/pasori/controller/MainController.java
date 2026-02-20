@@ -70,9 +70,6 @@ public class MainController implements Initializable {
     @FXML private CheckBox filterAntennaToPasoriCheck;
     @FXML private CheckBox filterSystemCheck;
 
-    // Manual send controls
-    @FXML private TextField sendDataField;
-    @FXML private Button sendBtn;
 
     private final CommunicationBridgeService bridgeService;
     private final ObservableList<Integer> baudRates;
@@ -346,32 +343,6 @@ public class MainController implements Initializable {
         allLogEntries.clear();
     }
 
-    @FXML
-    private void handleSendData() {
-        String hexInput = sendDataField.getText().trim();
-        if (hexInput.isEmpty()) {
-            showAlert(I18N.get("error.title"), I18N.get("error.enterHexData"));
-            return;
-        }
-
-        byte[] data;
-        try {
-            data = hexStringToByteArray(hexInput);
-        } catch (IllegalArgumentException e) {
-            showAlert(I18N.get("error.title"), I18N.get("error.invalidHexFormat"));
-            return;
-        }
-
-        if (!bridgeService.isAntennaIfConnected()) {
-            showAlert(I18N.get("error.title"), I18N.get("error.antennaNotConnected"));
-            return;
-        }
-
-        int result = bridgeService.sendToAntennaIf(data);
-        if (result > 0) {
-            sendDataField.clear();
-        }
-    }
 
     private void refreshPorts() {
         String[] portNames = SerialPortService.getAvailablePortNames();
@@ -503,26 +474,6 @@ public class MainController implements Initializable {
             styledLogArea.requestFollowCaret();
             styledLogArea.moveTo(styledLogArea.getLength());
         }
-    }
-
-    private byte[] hexStringToByteArray(String hex) {
-        // Remove spaces and convert to uppercase
-        hex = hex.replaceAll("\\s+", "").toUpperCase();
-        
-        if (hex.length() % 2 != 0) {
-            throw new IllegalArgumentException("Hex string must have even length");
-        }
-
-        byte[] data = new byte[hex.length() / 2];
-        for (int i = 0; i < hex.length(); i += 2) {
-            int high = Character.digit(hex.charAt(i), 16);
-            int low = Character.digit(hex.charAt(i + 1), 16);
-            if (high == -1 || low == -1) {
-                throw new IllegalArgumentException("Invalid hex character");
-            }
-            data[i / 2] = (byte) ((high << 4) + low);
-        }
-        return data;
     }
 
     /**
