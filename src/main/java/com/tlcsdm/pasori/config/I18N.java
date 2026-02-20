@@ -35,7 +35,7 @@ public class I18N {
      */
     private static void initializeLocale() {
         String savedLanguage = PREFS.get(PREF_KEY_LANGUAGE, null);
-        
+
         if (savedLanguage != null) {
             currentLocale = Locale.forLanguageTag(savedLanguage);
         } else {
@@ -49,7 +49,7 @@ public class I18N {
             // Save the initial setting
             saveLanguagePreference(currentLocale);
         }
-        
+
         loadBundle();
     }
 

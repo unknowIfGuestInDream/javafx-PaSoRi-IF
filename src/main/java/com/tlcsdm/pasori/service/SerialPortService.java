@@ -24,7 +24,7 @@ public class SerialPortService {
 
     /**
      * Get list of all available serial ports.
-     * 
+     *
      * @return array of available SerialPort objects
      */
     public static SerialPort[] getAvailablePorts() {
@@ -33,7 +33,7 @@ public class SerialPortService {
 
     /**
      * Get list of available port names.
-     * 
+     *
      * @return array of port name strings
      */
     public static String[] getAvailablePortNames() {
@@ -45,7 +45,7 @@ public class SerialPortService {
 
     /**
      * Connect to a serial port with the given configuration.
-     * 
+     *
      * @param config the serial port configuration
      * @return true if connection successful, false otherwise
      */
@@ -55,7 +55,7 @@ public class SerialPortService {
         }
 
         serialPort = SerialPort.getCommPort(config.getPortName());
-        
+
         if (serialPort == null) {
             if (errorCallback != null) {
                 errorCallback.accept("Failed to find port: " + config.getPortName());
@@ -68,7 +68,7 @@ public class SerialPortService {
         serialPort.setNumDataBits(config.getDataBits());
         serialPort.setNumStopBits(config.getStopBits());
         serialPort.setParity(config.getParity());
-        
+
         // Set timeouts
         serialPort.setComPortTimeouts(SerialPort.TIMEOUT_READ_SEMI_BLOCKING, 100, 0);
 
@@ -121,7 +121,7 @@ public class SerialPortService {
 
     /**
      * Send data to the serial port.
-     * 
+     *
      * @param data the byte array to send
      * @return the number of bytes written, or -1 if error
      */
@@ -144,7 +144,7 @@ public class SerialPortService {
 
     /**
      * Check if connected to a serial port.
-     * 
+     *
      * @return true if connected, false otherwise
      */
     public boolean isConnected() {
@@ -153,7 +153,7 @@ public class SerialPortService {
 
     /**
      * Set callback for received data.
-     * 
+     *
      * @param callback the callback function that receives byte array data
      */
     public void setDataReceivedCallback(Consumer<byte[]> callback) {
@@ -162,7 +162,7 @@ public class SerialPortService {
 
     /**
      * Set callback for errors.
-     * 
+     *
      * @param callback the callback function that receives error messages
      */
     public void setErrorCallback(Consumer<String> callback) {
@@ -171,7 +171,7 @@ public class SerialPortService {
 
     /**
      * Get the current serial port.
-     * 
+     *
      * @return the SerialPort object or null if not connected
      */
     public SerialPort getSerialPort() {
@@ -180,7 +180,7 @@ public class SerialPortService {
 
     /**
      * Get the port name if connected.
-     * 
+     *
      * @return port name or null if not connected
      */
     public String getPortName() {

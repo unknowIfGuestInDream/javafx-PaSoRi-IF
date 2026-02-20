@@ -19,7 +19,7 @@ import java.util.function.Supplier;
  * when switching between different theme families (e.g., from Modena to AtlantaFX).
  */
 public enum AppTheme {
-    
+
     ATLANTAFX_PRIMER_LIGHT("settings.theme.atlantafx.primerLight", PrimerLight::new),
     ATLANTAFX_PRIMER_DARK("settings.theme.atlantafx.primerDark", PrimerDark::new),
     ATLANTAFX_NORD_LIGHT("settings.theme.atlantafx.nordLight", NordLight::new),

@@ -82,13 +82,13 @@ public class LogEntry {
      */
     public String toString(boolean showTimestamp) {
         if (showTimestamp) {
-            return String.format("[%s] [%s] %s", 
-                timestamp.format(FORMATTER), 
-                direction.getDisplayName(), 
+            return String.format("[%s] [%s] %s",
+                timestamp.format(FORMATTER),
+                direction.getDisplayName(),
                 data);
         } else {
-            return String.format("[%s] %s", 
-                direction.getDisplayName(), 
+            return String.format("[%s] %s",
+                direction.getDisplayName(),
                 data);
         }
     }

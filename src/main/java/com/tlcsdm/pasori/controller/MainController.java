@@ -118,7 +118,7 @@ public class MainController implements Initializable {
         filterSystemCheck.selectedProperty().addListener((obs, oldVal, newVal) -> refreshLogDisplay());
 
         // Setup bridge service log callback
-        bridgeService.setLogCallback(entry -> 
+        bridgeService.setLogCallback(entry ->
             Platform.runLater(() -> addLogEntry(entry))
         );
 
@@ -146,11 +146,11 @@ public class MainController implements Initializable {
         styledLogArea.setEditable(false);
         styledLogArea.setWrapText(true);
         styledLogArea.setStyle("-fx-font-family: monospace; -fx-font-size: 12px;");
-        
+
         // Create scroll pane wrapper
         logScrollPane = new VirtualizedScrollPane<>(styledLogArea);
         VBox.setVgrow(logScrollPane, javafx.scene.layout.Priority.ALWAYS);
-        
+
         // Replace the placeholder TextArea with our styled area
         // This approach is used because RichTextFX components cannot be directly declared in FXML
         if (logTextArea != null && logTextArea.getParent() instanceof VBox parent) {
@@ -164,7 +164,7 @@ public class MainController implements Initializable {
     @FXML
     private void handleOpenSettings() {
         var preferencesFx = AppSettings.getInstance().getPreferencesFx();
-        
+
         // Add listener to set icon and apply CSS fix when the settings dialog window appears
         ListChangeListener<Window> windowListener = change -> {
             while (change.next()) {
@@ -179,7 +179,7 @@ public class MainController implements Initializable {
             }
         };
         Window.getWindows().addListener(windowListener);
-        
+
         try {
             preferencesFx.show(true);
         } finally {
@@ -228,10 +228,10 @@ public class MainController implements Initializable {
         alert.setTitle(I18N.get("menu.about"));
         alert.setHeaderText("PaSoRi IF Tool");
         alert.setContentText(I18N.get("about.version") + "\n\n" + I18N.get("about.description"));
-        
+
         // Set application icon to the dialog stage
         setDialogIcon((Stage) alert.getDialogPane().getScene().getWindow());
-        
+
         alert.showAndWait();
     }
 
@@ -355,11 +355,11 @@ public class MainController implements Initializable {
 
     private void refreshPorts() {
         String[] portNames = SerialPortService.getAvailablePortNames();
-        
+
         String selectedAntenna = antennaPortCombo.getValue();
 
         ObservableList<String> portList = FXCollections.observableArrayList(portNames);
-        
+
         antennaPortCombo.setItems(portList);
 
         // Restore selection if still available
@@ -374,7 +374,7 @@ public class MainController implements Initializable {
         } else {
             addLogEntry(new LogEntry(LogEntry.Direction.SYSTEM, I18N.get("system.portsFound", ports.length), false));
             for (com.fazecast.jSerialComm.SerialPort port : ports) {
-                addLogEntry(new LogEntry(LogEntry.Direction.SYSTEM, 
+                addLogEntry(new LogEntry(LogEntry.Direction.SYSTEM,
                     "  - " + port.getSystemPortName() + " (" + port.getDescriptivePortName() + ")", false));
             }
         }
@@ -403,12 +403,12 @@ public class MainController implements Initializable {
     private void addLogEntry(LogEntry entry) {
         // Store the entry in the list
         allLogEntries.add(entry);
-        
+
         // Limit log size - trim from the beginning if too many entries
         if (allLogEntries.size() > MAX_LOG_ENTRIES) {
             allLogEntries.remove(0);
         }
-        
+
         // Check if this entry should be displayed based on current filter
         if (!isEntryVisible(entry)) {
             return;
@@ -418,18 +418,18 @@ public class MainController implements Initializable {
         String colorHex = AppSettings.getInstance().getLogColorHex(entry.getDirection());
         boolean showTimestamp = AppSettings.getInstance().isLogTimestampEnabled();
         String logText = entry.toString(showTimestamp);
-        
+
         // Add newline if not the first entry
         int startPos = styledLogArea.getLength();
         if (startPos > 0) {
             styledLogArea.appendText("\n");
             startPos = styledLogArea.getLength();
         }
-        
+
         // Append the log text with inline color styling
         styledLogArea.appendText(logText);
         int endPos = styledLogArea.getLength();
-        
+
         // Apply color style to the appended text
         styledLogArea.setStyle(startPos, endPos, "-fx-fill: " + colorHex + ";");
 
@@ -456,28 +456,28 @@ public class MainController implements Initializable {
      */
     private void refreshLogDisplay() {
         styledLogArea.clear();
-        
+
         boolean showTimestamp = AppSettings.getInstance().isLogTimestampEnabled();
-        
+
         for (LogEntry entry : allLogEntries) {
             if (!isEntryVisible(entry)) {
                 continue;
             }
-            
+
             String colorHex = AppSettings.getInstance().getLogColorHex(entry.getDirection());
             String logText = entry.toString(showTimestamp);
-            
+
             int startPos = styledLogArea.getLength();
             if (startPos > 0) {
                 styledLogArea.appendText("\n");
                 startPos = styledLogArea.getLength();
             }
-            
+
             styledLogArea.appendText(logText);
             int endPos = styledLogArea.getLength();
             styledLogArea.setStyle(startPos, endPos, "-fx-fill: " + colorHex + ";");
         }
-        
+
         // Auto scroll to bottom after refresh
         if (autoScrollCheck.isSelected()) {
             styledLogArea.requestFollowCaret();

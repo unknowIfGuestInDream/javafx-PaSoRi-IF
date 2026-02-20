@@ -10,7 +10,7 @@ package com.tlcsdm.pasori;
  * the main class to extend Application.
  */
 public class Launcher {
-    
+
     public static void main(String[] args) {
         PaSoRiApplication.main(args);
     }
