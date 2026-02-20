@@ -38,14 +38,14 @@ public class AppSettings {
     private final ObjectProperty<Color> logColorPasoriToAntennaProperty;
     private final ObjectProperty<Color> logColorAntennaToPasoriProperty;
     private final ObjectProperty<Color> logColorSystemProperty;
-    
+
     private PreferencesFx preferencesFx;
 
     private AppSettings() {
         // Initialize properties from saved preferences
         languageProperty = new SimpleObjectProperty<>(new DisplayLocale(I18N.getCurrentLocale()));
         themeProperty = new SimpleObjectProperty<>(AppTheme.getSavedTheme());
-        
+
         // Log settings
         logTimestampProperty = new SimpleBooleanProperty(PREFS.getBoolean(PREF_LOG_TIMESTAMP, true));
         logColorPasoriToAntennaProperty = new SimpleObjectProperty<>(
@@ -71,13 +71,13 @@ public class AppSettings {
         });
 
         // Log settings listeners
-        logTimestampProperty.addListener((obs, oldVal, newVal) -> 
+        logTimestampProperty.addListener((obs, oldVal, newVal) ->
             PREFS.putBoolean(PREF_LOG_TIMESTAMP, newVal));
-        logColorPasoriToAntennaProperty.addListener((obs, oldVal, newVal) -> 
+        logColorPasoriToAntennaProperty.addListener((obs, oldVal, newVal) ->
             saveColor(PREF_LOG_COLOR_PASORI_TO_ANTENNA, newVal));
-        logColorAntennaToPasoriProperty.addListener((obs, oldVal, newVal) -> 
+        logColorAntennaToPasoriProperty.addListener((obs, oldVal, newVal) ->
             saveColor(PREF_LOG_COLOR_ANTENNA_TO_PASORI, newVal));
-        logColorSystemProperty.addListener((obs, oldVal, newVal) -> 
+        logColorSystemProperty.addListener((obs, oldVal, newVal) ->
             saveColor(PREF_LOG_COLOR_SYSTEM, newVal));
     }
 

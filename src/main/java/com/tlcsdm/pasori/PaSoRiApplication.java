@@ -15,10 +15,11 @@ import javafx.stage.Stage;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.ResourceBundle;
 
 /**
  * Main JavaFX Application for PaSoRi-IF serial communication tool.
- * 
+ *
  * This application allows communication between:
  * - PaSoRi device (via SDK serial port)
  * - USB CDC-ACM device (アンテナIF仕様)
@@ -36,19 +37,19 @@ public class PaSoRiApplication extends Application {
     @Override
     public void start(Stage primaryStage) throws IOException {
         FXMLLoader loader = new FXMLLoader(getClass().getResource("main.fxml"));
-        loader.setResources(java.util.ResourceBundle.getBundle(
+        loader.setResources(ResourceBundle.getBundle(
             "com.tlcsdm.pasori.i18n.messages", I18N.getCurrentLocale()));
         Parent root = loader.load();
         controller = loader.getController();
         controller.setPrimaryStage(primaryStage);
-        
+
         Scene scene = new Scene(root, 900, 700);
-        
+
         primaryStage.setTitle(I18N.get("app.title"));
         primaryStage.setScene(scene);
         primaryStage.setMinWidth(800);
         primaryStage.setMinHeight(600);
-        
+
         // Set application icon
         try (InputStream iconStream = getClass().getResourceAsStream("images/logo.png")) {
             if (iconStream != null) {
@@ -57,7 +58,7 @@ public class PaSoRiApplication extends Application {
                 System.err.println("Warning: Application icon not found at images/logo.png");
             }
         }
-        
+
         primaryStage.setOnCloseRequest(event -> {
             if (controller != null) {
                 controller.shutdown();

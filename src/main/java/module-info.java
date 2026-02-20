@@ -19,7 +19,7 @@ module com.tlcsdm.pasori {
     opens com.tlcsdm.pasori.controller to javafx.fxml;
     opens com.tlcsdm.pasori.config to com.dlsc.preferencesfx;
     opens com.tlcsdm.pasori.model to com.google.gson;
-    
+
     exports com.tlcsdm.pasori;
     exports com.tlcsdm.pasori.controller;
     exports com.tlcsdm.pasori.model;

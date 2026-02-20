@@ -20,7 +20,7 @@ public class DisplayLocale {
 
     /**
      * Get the wrapped Locale.
-     * 
+     *
      * @return the Locale
      */
     public Locale getLocale() {
