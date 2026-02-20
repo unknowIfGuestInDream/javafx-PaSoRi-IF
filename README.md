@@ -11,10 +11,6 @@ This application bridges two communication interfaces:
 
 The relay receives IF protocol commands from the serial port, executes the corresponding NFC operations via the FeliCa SDK, and returns IF protocol responses back to the serial port.
 
-## IF Communication Protocol
-
-See [docs/if-protocol.md](docs/if-protocol.md) for the full protocol specification, including message format, command list, CardAccess routing, and exception responses.
-
 ## Architecture
 
 ```
@@ -33,10 +29,6 @@ See [docs/if-protocol.md](docs/if-protocol.md) for the full protocol specificati
 - **PaSoRiSdkService**: FeliCa SDK wrapper — initializes the library, opens the reader, polls for cards, sends raw FeliCa commands via `thru()`
 - **FelicaLibrary**: JNA interface to felica.dll — maps native C functions for reader control, card polling, and data exchange
 - **SerialPortService**: Serial port communication via jSerialComm — connects to USB CDC-ACM devices
-
-## Quick Start (Non-Java Users)
-
-See [docs/quick-start.md](docs/quick-start.md) for instructions on downloading a release or building from source without Java knowledge.
 
 ## Requirements
 
