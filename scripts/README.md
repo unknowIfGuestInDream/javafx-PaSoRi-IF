@@ -33,9 +33,7 @@ Extracts the Maven project version, locates the built jar, and copies all necess
 ### 3. Create Custom JRE
 
 ```powershell
-Push-Location staging
-..\scripts\jre.ps1
-Pop-Location
+.\scripts\jre.ps1 -StagingDir staging
 ```
 
 Downloads the Adoptium JDK 21 for Windows x64, uses `jdeps` to analyze the application jar

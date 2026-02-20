@@ -6,10 +6,20 @@
     Downloads the Adoptium JDK, uses jdeps to analyze the application jar for required
     JDK modules, then creates a custom runtime image with jlink containing only those modules.
     This significantly reduces the JRE size compared to a full JRE download.
-    This script should be called from the staging directory containing the application jar.
+
+.PARAMETER StagingDir
+    Path to the staging directory containing the application jar.
+    Defaults to the current directory ('.').
 #>
 
+param(
+    [string]$StagingDir = '.'
+)
+
 $ErrorActionPreference = 'Stop'
+
+Push-Location $StagingDir
+try {
 
 # see https://api.adoptium.net/q/swagger-ui/#/Binary/getBinaryByVersion
 $jdkVersion = 'jdk-21.0.10%2B7'
@@ -72,3 +82,6 @@ if ($LASTEXITCODE -ne 0) { throw "jlink failed with exit code $LASTEXITCODE" }
 Remove-Item -Path $jdkDir -Recurse -Force
 
 Write-Host "Custom JRE created successfully." -ForegroundColor Green
+} finally {
+    Pop-Location
+}

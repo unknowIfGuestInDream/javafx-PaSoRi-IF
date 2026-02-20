@@ -33,9 +33,7 @@ jobs:
       - name: Create Custom JRE with jlink
         shell: pwsh
         run: |
-          Push-Location staging
-          & ..\scripts\jre.ps1
-          Pop-Location
+          & scripts\jre.ps1 -StagingDir staging
 
       - name: Package artifact
         shell: pwsh
