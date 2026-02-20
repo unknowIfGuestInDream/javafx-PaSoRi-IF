@@ -83,21 +83,83 @@ The CardAccess command analyzes the FeliCa data link layer command code to deter
 
 ## Building
 
-```bash
-mvn clean package
+### Quick Build (Maven)
+
+Build the fat JAR using the Maven wrapper included in the project:
+
+```powershell
+# Windows (Maven wrapper)
+.\mvnw.cmd clean package -DskipTests
+
+# Or using system Maven
+mvn clean package -DskipTests
 ```
+
+The fat JAR is output to `target/javafx-pasori-if.jar`.
+
+### Build Script
+
+The project provides a PowerShell build script that configures an Aliyun Maven mirror (faster downloads in China) and invokes the Maven wrapper automatically:
+
+```powershell
+# Build without tests (default)
+.\scripts\build.ps1
+
+# Build with tests
+.\scripts\build.ps1 -RunTests
+```
+
+### Full Packaging (Distributable with Custom JRE)
+
+To create a self-contained distributable zip that includes a minimal custom JRE (no need for users to install Java), run the following scripts **in order** from the project root on Windows:
+
+```powershell
+# 1. Build the fat JAR
+.\scripts\build.ps1
+
+# 2. Resolve version and prepare staging directory
+#    Copies the jar, README, and launcher scripts to staging/
+.\scripts\resolve-version.ps1
+
+# 3. Create a minimal custom JRE via jlink
+#    Downloads Adoptium JDK, analyzes module dependencies with jdeps,
+#    and produces a stripped-down JRE in staging/jre/
+Push-Location staging
+..\scripts\jre.ps1
+Pop-Location
+
+# 4. Package into a distributable zip
+#    Creates dist/Pasori-if-windows-<version>.zip
+.\scripts\package-artifact.ps1
+```
+
+The resulting zip in `dist/` contains everything needed to run the application on Windows without a pre-installed JDK.
+
+> **Note**: The `jre.ps1` script downloads a JDK from [Adoptium](https://adoptium.net/) to build the custom JRE. Internet access is required for this step.
 
 ## Running
 
-```bash
+### From Source (Development)
+
+```powershell
 mvn javafx:run
 ```
 
-Or run the JAR directly:
+Or run the built JAR directly (requires JDK 21 on `PATH`):
 
-```bash
+```powershell
 java -jar target/javafx-pasori-if.jar
 ```
+
+### From Distributable Package
+
+Extract the packaged zip and use the included launcher scripts:
+
+- **`start.bat`** — Launches the application in the background (no console window)
+- **`start.vbs`** — Launches via `start.bat` with a hidden console window
+- **`console.bat`** — Launches with a visible console window (useful for debugging)
+
+The launchers automatically detect the bundled `jre/` directory. If the custom JRE is not present, they fall back to the system `java` on `PATH`.
 
 ## Usage
 
