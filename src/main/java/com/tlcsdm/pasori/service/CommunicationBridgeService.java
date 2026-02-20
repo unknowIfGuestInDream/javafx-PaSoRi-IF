@@ -48,6 +48,7 @@ public class CommunicationBridgeService {
     private static final int MAX_RETRY_ATTEMPTS = 100;
 
     private Consumer<LogEntry> logCallback;
+    private volatile Consumer<byte[]> manualReceiveCallback;
     private volatile boolean bridgingEnabled = false;
     private volatile boolean nfcCarrierOn = false;
     private volatile boolean running = true;
@@ -146,6 +147,10 @@ public class CommunicationBridgeService {
         // IF protocol frame processing: accumulate and process commands from IF device
         antennaIfService.setDataReceivedCallback(data -> {
             log(LogEntry.Direction.ANTENNA_TO_PASORI, data);
+            Consumer<byte[]> cb = manualReceiveCallback;
+            if (cb != null) {
+                cb.accept(data);
+            }
             if (bridgingEnabled) {
                 byte[] frame = frameAccumulator.feed(data);
                 if (frame != null) {
@@ -456,6 +461,15 @@ public class CommunicationBridgeService {
      */
     public void setLogCallback(Consumer<LogEntry> callback) {
         this.logCallback = callback;
+    }
+
+    /**
+     * Set a callback for data received from the IF device (used by manual send dialog).
+     *
+     * @param callback the callback function, or null to remove
+     */
+    public void setManualReceiveCallback(Consumer<byte[]> callback) {
+        this.manualReceiveCallback = callback;
     }
 
     /**

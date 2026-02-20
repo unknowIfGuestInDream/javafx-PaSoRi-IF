@@ -20,6 +20,7 @@
         </Menu>
         <Menu text="%menu.tool">
             <MenuItem text="%menu.exportLog" onAction="#handleExportLog"/>
+            <MenuItem text="%menu.manualSend" onAction="#handleManualSend"/>
         </Menu>
         <Menu text="%menu.help">
             <MenuItem text="%menu.about" onAction="#handleAbout"/>
@@ -102,14 +103,6 @@
             <TextArea fx:id="logTextArea" VBox.vgrow="ALWAYS" editable="false" wrapText="true" style="-fx-font-family: monospace;"/>
         </VBox>
 
-        <!-- Manual Send Panel (to Antenna IF) -->
-        <VBox spacing="5" style="-fx-border-color: #ccc; -fx-border-radius: 5; -fx-padding: 10;">
-            <Label text="%send.title" style="-fx-font-weight: bold; -fx-font-size: 14px;"/>
-            <HBox spacing="10" alignment="CENTER_LEFT">
-                <TextField fx:id="sendDataField" HBox.hgrow="ALWAYS" promptText="%send.placeholder"/>
-                <Button fx:id="sendBtn" text="%button.send" onAction="#handleSendData" prefWidth="80"/>
-            </HBox>
-        </VBox>
 
     </VBox>
 </VBox>
