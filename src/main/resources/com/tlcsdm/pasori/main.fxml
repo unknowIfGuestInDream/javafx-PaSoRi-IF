@@ -20,6 +20,7 @@
         </Menu>
         <Menu text="%menu.tool">
             <MenuItem text="%menu.exportLog" onAction="#handleExportLog"/>
+            <MenuItem text="%menu.manualSend" onAction="#handleManualSend"/>
         </Menu>
         <Menu text="%menu.help">
             <MenuItem text="%menu.about" onAction="#handleAbout"/>

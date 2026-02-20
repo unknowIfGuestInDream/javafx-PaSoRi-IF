@@ -79,6 +79,7 @@ public class MainController implements Initializable {
     private ResourceBundle resources;
     private InlineCssTextArea styledLogArea;
     private VirtualizedScrollPane<InlineCssTextArea> logScrollPane;
+    private ManualSendDialog manualSendDialog;
 
     private static final int MAX_LOG_ENTRIES = 1000;
     private static final String ICON_PATH = "/com/tlcsdm/pasori/images/logo.png";
@@ -341,6 +342,14 @@ public class MainController implements Initializable {
     private void handleClearLog() {
         styledLogArea.clear();
         allLogEntries.clear();
+    }
+
+    @FXML
+    private void handleManualSend() {
+        if (manualSendDialog == null) {
+            manualSendDialog = new ManualSendDialog(primaryStage, bridgeService);
+        }
+        manualSendDialog.show();
     }
 
 
